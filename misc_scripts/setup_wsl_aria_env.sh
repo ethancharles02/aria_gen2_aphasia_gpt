@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
+# You may need to install WSL Ubuntu before you can run this script. Open Windows Powershell with admin privileges and run wsl --install -d Ubuntu-22.04
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="$REPO_ROOT/.venv"
 PYTHON_BIN="$VENV_DIR/bin/python"
-PIP_BIN="$VENV_DIR/bin/pip"
-ARIA_SITE_PACKAGES="$VENV_DIR/lib/python3.10/site-packages/aria"
+ACTIVATE_BIN="$VENV_DIR/bin/activate"
+ARIA_SITE_PACKAGES=""
 
 log() {
   echo "[setup] $*"
@@ -62,11 +63,23 @@ setup_python_env() {
     log "Using existing virtual environment at $VENV_DIR"
   fi
 
+  if [[ ! -f "$ACTIVATE_BIN" ]]; then
+    echo "[setup][error] Missing virtual environment activation script: $ACTIVATE_BIN" >&2
+    exit 1
+  fi
+
+  # Activate venv so all subsequent python/pip commands run in the correct environment.
+  # shellcheck disable=SC1091
+  source "$ACTIVATE_BIN"
+
   log "Installing Python dependencies"
-  "$PYTHON_BIN" -m pip install --upgrade pip
-  "$PIP_BIN" install \
+  python -m pip install --upgrade pip
+  python -m pip install \
     projectaria-client-sdk==2.3.0 \
     rerun-sdk==0.26.2
+
+  ARIA_SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/aria"
+  deactivate
 }
 
 fix_sdk_shared_object_suffixes() {
@@ -92,6 +105,44 @@ fix_sdk_shared_object_suffixes() {
 configure_network_manager_for_aria() {
   log "Configuring NetworkManager and udev for Aria USB interface"
 
+  sudo tee /usr/local/sbin/aria_usb_net_configure >/dev/null <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+INTERFACE="$1"
+
+if [[ -z "$INTERFACE" || ! -e "/sys/class/net/$INTERFACE" ]]; then
+  exit 0
+fi
+
+# Walk up the sysfs path until we find USB idVendor/idProduct and match Aria Gen2.
+sys_path="$(readlink -f "/sys/class/net/$INTERFACE/device" 2>/dev/null || true)"
+while [[ -n "$sys_path" && "$sys_path" != "/" ]]; do
+  if [[ -f "$sys_path/idVendor" && -f "$sys_path/idProduct" ]]; then
+    vendor="$(tr '[:upper:]' '[:lower:]' < "$sys_path/idVendor")"
+    product="$(tr '[:upper:]' '[:lower:]' < "$sys_path/idProduct")"
+    if [[ "$vendor" == "2833" && "$product" == "9002" ]]; then
+      /sbin/ip link set dev "$INTERFACE" up || true
+
+      # DHCP can intermittently fail in WSL USBIP; use a bounded retry and fallback.
+      if command -v timeout >/dev/null 2>&1; then
+        timeout 12s /sbin/dhclient -1 "$INTERFACE" || timeout 12s /usr/sbin/dhclient -1 "$INTERFACE" || true
+      else
+        /sbin/dhclient -1 "$INTERFACE" || /usr/sbin/dhclient -1 "$INTERFACE" || true
+      fi
+
+      # If no IPv4 lease was obtained, set a fallback address on the known Aria USB subnet.
+      if ! /sbin/ip -4 addr show dev "$INTERFACE" | grep -q 'inet '; then
+        /sbin/ip addr add 192.168.109.64/24 dev "$INTERFACE" 2>/dev/null || true
+      fi
+    fi
+    exit 0
+  fi
+  sys_path="$(dirname "$sys_path")"
+done
+EOF
+  sudo chmod +x /usr/local/sbin/aria_usb_net_configure
+
   if [[ -f /etc/NetworkManager/NetworkManager.conf ]]; then
     sudo sed -i 's/managed=false/managed=true/g' /etc/NetworkManager/NetworkManager.conf
   fi
@@ -101,14 +152,14 @@ configure_network_manager_for_aria() {
 INTERFACE="$1"
 ACTION="$2"
 
-if [[ "$INTERFACE" == "aria_gen2" && "$ACTION" == "up" ]]; then
-  dhclient aria_gen2 || true
+if [[ "$ACTION" == "up" ]]; then
+  /usr/local/sbin/aria_usb_net_configure "$INTERFACE"
 fi
 EOF
   sudo chmod +x /etc/NetworkManager/dispatcher.d/99-aria-dhcp
 
   sudo tee /etc/udev/rules.d/99-aria-dhcp.rules >/dev/null <<'EOF'
-ACTION=="add", SUBSYSTEM=="net", ATTRS{idVendor}=="2833", ATTRS{idProduct}=="9002", RUN+="/sbin/dhclient aria_gen2"
+ACTION=="add", SUBSYSTEM=="net", ATTRS{idVendor}=="2833", ATTRS{idProduct}=="9002", RUN+="/usr/local/sbin/aria_usb_net_configure %k"
 EOF
 
   sudo udevadm control --reload-rules || true
@@ -116,11 +167,58 @@ EOF
   if command -v systemctl >/dev/null 2>&1; then
     sudo systemctl restart NetworkManager || warn "Could not restart NetworkManager with systemctl"
   fi
+
+  # If the Aria interface is already attached while setup runs, configure it now.
+  for iface in /sys/class/net/*; do
+    [[ -e "$iface" ]] || continue
+    sudo /usr/local/sbin/aria_usb_net_configure "$(basename "$iface")"
+  done
+}
+
+ensure_aria_usb_network_ready() {
+  log "Ensuring Aria USB network has an IPv4 lease"
+
+  local matched=0
+  for iface in /sys/class/net/*; do
+    [[ -e "$iface" ]] || continue
+    local ifname
+    ifname="$(basename "$iface")"
+
+    local sys_path
+    sys_path="$(readlink -f "$iface/device" 2>/dev/null || true)"
+    while [[ -n "$sys_path" && "$sys_path" != "/" ]]; do
+      if [[ -f "$sys_path/idVendor" && -f "$sys_path/idProduct" ]]; then
+        local vendor product
+        vendor="$(tr '[:upper:]' '[:lower:]' < "$sys_path/idVendor")"
+        product="$(tr '[:upper:]' '[:lower:]' < "$sys_path/idProduct")"
+
+        if [[ "$vendor" == "2833" && "$product" == "9002" ]]; then
+          matched=1
+          sudo /usr/local/sbin/aria_usb_net_configure "$ifname" || true
+          local addr
+          addr="$(ip -4 -br addr show "$ifname" 2>/dev/null || true)"
+          log "Aria USB interface $ifname: $addr"
+          if ! echo "$addr" | grep -q 'inet'; then
+            warn "No IPv4 lease on $ifname after DHCP — device discovery may fail."
+            warn "Try: sudo /usr/local/sbin/aria_usb_net_configure $ifname"
+          fi
+        fi
+        break
+      fi
+      sys_path="$(dirname "$sys_path")"
+    done
+  done
+
+  if [[ "$matched" -eq 0 ]]; then
+    warn "No Aria USB network interface detected — is the USB attached and usbipd running?"
+  fi
 }
 
 validate_install() {
   log "Validating Aria imports"
   "$PYTHON_BIN" -c "import aria.sdk_gen2; import aria.stream_receiver; print('Aria SDK import OK')"
+
+  ensure_aria_usb_network_ready
 }
 
 print_next_steps() {
@@ -129,20 +227,32 @@ print_next_steps() {
 Setup complete.
 
 Next steps:
-1) Attach Aria USB to WSL from Windows PowerShell:
-   usbipd attach --wsl --busid <BUSID>
+1) Install usbipd from Windows Powershell:
+    winget install usbipd
 
-2) In WSL, verify device visibility:
-   .venv/bin/aria_gen2 device list
+2) Check for Aria Glasses in Windows Powershell (look for UsbNcm Host Device):
+    usbipd list
 
-3) Start device streaming (example profile):
-   .venv/bin/aria_gen2 streaming start --json-profile agpt_lib/streaming.json --batch-period-ms 200 --interface wifi_sta
+3) Attach Aria USB to WSL from Windows PowerShell:
+    usbipd attach --wsl --busid <BUSID>
 
-4) Start WSL-safe viewer bridge:
-   .venv/bin/python agpt_lib/wsl_streaming_viewer.py --real-time --interpolate --rerun-memory-limit 4GB
+4) Run aria_doctor and say yes to any messages it gives
+    .venv/bin/aria_doctor
 
-5) In Windows PowerShell, connect Rerun:
-   py -m rerun rerun+http://127.0.0.1:9876/proxy
+5) In WSL, verify device visibility:
+    .venv/bin/aria_gen2 device list
+
+6) Pair host certificates with the headset (first-time only):
+    .venv/bin/aria_gen2 auth pair
+
+7) Start device streaming (example profile):
+    .venv/bin/aria_gen2 streaming start --json-profile agpt_lib/streaming.json --batch-period-ms 200 --interface wifi_sta
+
+8) Start WSL-safe viewer bridge:
+    .venv/bin/python agpt_lib/wsl_streaming_viewer.py --real-time --interpolate --rerun-memory-limit 4GB
+
+9) In Windows PowerShell, connect Rerun:
+    py -m rerun rerun+http://127.0.0.1:9876/proxy
 EOF
 }
 
