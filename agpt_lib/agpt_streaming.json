@@ -1,0 +1,60 @@
+{
+  "name": "aphasia_gpt",
+  "description": "Used specifically for eye-tracking, rgb camera, and audio",
+  "imus": {
+    "rateHz": 800
+  },
+  "audio": {
+    "sampleRate": "R_16KHZ",
+    "framePeriod": "P_20MS",
+    "sampleFormat": "S16",
+    "encodingFormat": "OPUS",
+    "opusConfig": {
+      "complexity": 10,
+      "bitrate": 256000
+    }
+  },
+  "etCameras": {
+    "rateHz": 5,
+    "autoExposure": {},
+    "encoding": "H265",
+    "videoConfig": {
+      "cqp": {
+        "qp": 30
+      }
+    },
+    "resolution": "R_200x200",
+    "irLed": "TRUE"
+  },
+  "rgbCamera": {
+    "rateHz": 10,
+    "autoExposure": {},
+    "encoding": "H265",
+    "videoConfig": {
+      "cbr": {
+        "bitrate": 1200000
+      }
+    },
+    "resolution": "R_4032x3024",
+    "blurFilterConfig": {
+      "enabled": "TRUE",
+      "threshold": 60,
+      "windowMs": 400
+    },
+    "width": 2016,
+    "height": 1512
+  },
+  "et": {
+    "rateHz": 30
+  },
+  "deviceInfo": {
+    "periodMs": 10000
+  },
+  "temperature": {
+    "rateHz": 1
+  },
+  "type": "STREAMING",
+  "recommended": true,
+  "public": true,
+  "__type": "OATMEAL"
+}
