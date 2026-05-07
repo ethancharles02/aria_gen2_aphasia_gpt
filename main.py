@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# WARNING: Requires Aria Gen 2 Client-SDK to be installed (see
+# https://facebookresearch.github.io/projectaria_tools/gen2/ark/client-sdk/start)
+
 # Real-time phrase transcription logic adapted from:
 # https://github.com/davabase/whisper_real_time/blob/master/transcribe_demo.py
 # Credit: davabase (original creator).
