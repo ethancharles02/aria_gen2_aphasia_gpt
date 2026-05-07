@@ -14,6 +14,13 @@ import threading
 import time
 import torch
 
+_has_whisper = False
+try:
+    import whisper
+    _has_whisper = True
+except ImportError:
+    print("Whisper is not installed; audio transcription is disabled.")
+
 import aria.stream_receiver as receiver
 import aria.sdk_gen2 as sdk_gen2
 from projectaria_tools.core.mps import EyeGaze
@@ -37,12 +44,8 @@ _worker_stop_event = threading.Event()
 _transcription_started_at = 0.0
 
 def init_whisper_model() -> None:
-    global _whisper
-    try:
-        import whisper
-    except ImportError:
-        print("Whisper is not installed; audio transcription is disabled.")
-        _whisper = None
+    global _whisper, _has_whisper
+    if not _has_whisper:
         return
 
     print(f"Loading Whisper model '{WHISPER_MODEL_NAME}'...")
@@ -81,7 +84,7 @@ def resample_audio(audio: np.ndarray, source_sample_rate_hz: int) -> np.ndarray:
 
 def start_transcription_worker() -> None:
     global _worker_thread, _transcription_started_at
-    if _whisper is None or (_worker_thread is not None and _worker_thread.is_alive()):
+    if not _has_whisper or (_worker_thread is not None and _worker_thread.is_alive()):
         return
 
     _worker_stop_event.clear()

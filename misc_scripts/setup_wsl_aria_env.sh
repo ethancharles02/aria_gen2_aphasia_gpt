@@ -71,8 +71,10 @@ setup_python_env() {
   log "Installing Python dependencies"
   python -m pip install --upgrade pip
   python -m pip install \
-    projectaria-client-sdk==2.3.0 \
-    rerun-sdk==0.26.2
+    projectaria-client-sdk \
+    rerun-sdk \
+    torch \
+    openai-whisper
 
   ARIA_SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/aria"
   deactivate
@@ -230,7 +232,7 @@ Next steps:
     usbipd list
 
 3) Attach Aria USB to WSL from Windows PowerShell:
-    usbipd attach --wsl Ubuntu-22.04 --busid <BUSID> --auto-attach
+    usbipd attach --wsl Ubuntu-22.04 --busid <BUSID>
 
 4) In WSL, activate venv
     source .venv/bin/activate
@@ -251,10 +253,13 @@ Next steps:
     aria_gen2 streaming start --json-profile agpt_lib/streaming.json --batch-period-ms 200 --interface wifi_sta
 
 10) Start WSL-safe viewer bridge:
-    python agpt_lib/wsl_streaming_viewer.py --real-time --interpolate --rerun-memory-limit 4GB
+    python misc_scripts/wsl_streaming_viewer.py --real-time --interpolate --rerun-memory-limit 4GB
 
-11) In Windows PowerShell, connect Rerun:
+11) In Windows PowerShell, connect Rerun (install once if needed: py -m pip install rerun-sdk):
     py -m rerun rerun+http://127.0.0.1:9876/proxy
+
+12) Stop streaming with the following command:
+    aria_gen2 streaming stop
 EOF
 }
 
