@@ -225,20 +225,20 @@ print_next_steps() {
 Setup complete.
 
 Next steps:
-1) Install usbipd from Windows Powershell:
-    winget install usbipd
-
-2) Check for Aria Glasses in Windows Powershell (look for UsbNcm Host Device):
-    usbipd list
-
-3) Attach Aria USB to WSL from Windows PowerShell:
-    usbipd attach --wsl Ubuntu-22.04 --busid <BUSID>
-
-4) In WSL, activate venv
+1) In WSL, activate venv
     source .venv/bin/activate
 
-5) Run aria_doctor and say yes to any messages it gives
+2) Run aria_doctor and say yes to any messages it gives
     aria_doctor
+
+3) Install usbipd from Windows Powershell:
+    winget install usbipd
+
+4) Plug in and check for Aria Glasses in Windows Powershell (look for UsbNcm Host Device):
+    usbipd list
+
+5) Attach Aria USB to WSL from Windows PowerShell:
+    usbipd attach --wsl Ubuntu-22.04 --busid <BUSID>
 
 6) Run the below script to refresh the USB data to aria can see it:
   ./misc_scripts/prepare_aria_view.sh
@@ -260,6 +260,8 @@ Next steps:
 
 12) Stop streaming with the following command:
     aria_gen2 streaming stop
+
+13) Note that steps 4, 5, and 6 will need to be repeated whenever the device is unplugged or the computer is restarted
 EOF
 }
 
@@ -267,7 +269,6 @@ main() {
   need_cmd python3
   need_cmd sudo
   ensure_sudo
-
   install_apt_prereqs
   ensure_new_libstdcpp
   setup_python_env
