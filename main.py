@@ -161,10 +161,10 @@ def device_streaming() -> sdk_gen2.Device:
     # Set recording config with profile name
     streaming_config = sdk_gen2.HttpStreamingConfig()
 
-    if STREAM_CONFIG_FROM_DEVICE:
-        streaming_config.profile_name = STREAM_CONFIG_NAME
-    else:
+    if STREAM_CONFIG_NAME.endswith(".json"):
         streaming_config.profile_json = STREAM_CONFIG_NAME
+    else:
+        streaming_config.profile_name = STREAM_CONFIG_NAME
 
     if STREAM_OVER_WIFI:
         print("Streaming data over Wi-Fi")
