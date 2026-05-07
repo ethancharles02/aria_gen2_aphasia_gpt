@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# You may need to install WSL Ubuntu before you can run this script. Open Windows Powershell with admin privileges and run wsl --install -d Ubuntu-22.04
+# You may need to install WSL Ubuntu before you can run this script. Open Windows Powershell with
+# admin privileges and run
+#   wsl --install -d Ubuntu-22.04
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -175,6 +177,31 @@ EOF
   done
 }
 
+configure_wsl_boot() {
+  log "Configuring WSL boot command for Aria USB network"
+
+  # Write a boot script that scans all interfaces after WSL starts.
+  # The delay gives usbipd time to auto-attach the device after Windows boots.
+  sudo tee /usr/local/sbin/aria_wsl_boot >/dev/null <<'EOF'
+#!/usr/bin/env bash
+# Triggered on every WSL startup via /etc/wsl.conf [boot].
+# Wait for usbipd to reattach the Aria USB device, then run DHCP.
+sleep 10
+for f in /sys/class/net/*; do
+  [ -e "$f" ] && /usr/local/sbin/aria_usb_net_configure "$(basename "$f")"
+done
+EOF
+  sudo chmod +x /usr/local/sbin/aria_wsl_boot
+
+  # Add [boot] command to /etc/wsl.conf, creating the file if needed.
+  if ! sudo grep -q '^\[boot\]' /etc/wsl.conf 2>/dev/null; then
+    printf '\n[boot]\ncommand = /usr/local/sbin/aria_wsl_boot\n' | sudo tee -a /etc/wsl.conf >/dev/null
+  elif ! sudo grep -q 'aria_wsl_boot' /etc/wsl.conf 2>/dev/null; then
+    sudo sed -i '/^\[boot\]/a command = /usr/local/sbin/aria_wsl_boot' /etc/wsl.conf
+  fi
+  log "WSL boot command configured in /etc/wsl.conf"
+}
+
 ensure_aria_usb_network_ready() {
   log "Ensuring Aria USB network has an IPv4 lease"
 
@@ -227,6 +254,9 @@ print_next_steps() {
 Setup complete.
 
 Next steps:
+0) Restart WSL once to activate the boot command (from Windows PowerShell, then reopen WSL):
+    wsl --shutdown
+
 1) Install usbipd from Windows Powershell:
     winget install usbipd
 
@@ -234,24 +264,27 @@ Next steps:
     usbipd list
 
 3) Attach Aria USB to WSL from Windows PowerShell:
-    usbipd attach --wsl --busid <BUSID>
+    usbipd attach --wsl Ubuntu-22.04 --busid <BUSID> --auto-attach
 
-4) Run aria_doctor and say yes to any messages it gives
-    .venv/bin/aria_doctor
+4) In WSL, active venv
+    source .venv/bin/activate
 
-5) In WSL, verify device visibility:
-    .venv/bin/aria_gen2 device list
+5) Run aria_doctor and say yes to any messages it gives
+    aria_doctor
 
-6) Pair host certificates with the headset (first-time only):
-    .venv/bin/aria_gen2 auth pair
+6) In WSL, verify device visibility:
+    aria_gen2 device list
 
-7) Start device streaming (example profile):
-    .venv/bin/aria_gen2 streaming start --json-profile agpt_lib/streaming.json --batch-period-ms 200 --interface wifi_sta
+7) Pair host certificates with the headset (first-time only):
+    aria_gen2 auth pair
 
-8) Start WSL-safe viewer bridge:
-    .venv/bin/python agpt_lib/wsl_streaming_viewer.py --real-time --interpolate --rerun-memory-limit 4GB
+8) Start device streaming (example profile):
+    aria_gen2 streaming start --json-profile agpt_lib/streaming.json --batch-period-ms 200 --interface wifi_sta
 
-9) In Windows PowerShell, connect Rerun:
+9) Start WSL-safe viewer bridge:
+    python agpt_lib/wsl_streaming_viewer.py --real-time --interpolate --rerun-memory-limit 4GB
+
+10) In Windows PowerShell, connect Rerun:
     py -m rerun rerun+http://127.0.0.1:9876/proxy
 EOF
 }
@@ -266,6 +299,7 @@ main() {
   setup_python_env
   fix_sdk_shared_object_suffixes
   configure_network_manager_for_aria
+  configure_wsl_boot
   validate_install
   print_next_steps
 }
