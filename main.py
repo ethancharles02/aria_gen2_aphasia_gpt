@@ -32,7 +32,7 @@ from projectaria_tools.core.sensor_data import (
 )
 
 # For local secret variables
-from agpt_lib.secrets import *
+from agpt_lib.agpt_secrets import *
 from agpt_lib.aphasia_config import *
 
 device_client = sdk_gen2.DeviceClient()
