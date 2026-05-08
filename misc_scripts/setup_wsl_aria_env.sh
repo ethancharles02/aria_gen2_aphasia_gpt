@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# NOTE: Majority of this script written by AI
 # You may need to install WSL Ubuntu before you can run this script. Open Windows Powershell with
 # admin privileges and run
 #   wsl --install -d Ubuntu-22.04
@@ -75,9 +74,7 @@ setup_python_env() {
     projectaria-client-sdk \
     rerun-sdk \
     torch \
-    openai-whisper \
-    transformers \
-    gum-ai
+    openai-whisper
 
   ARIA_SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/aria"
   deactivate

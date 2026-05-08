@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# NOTE: Script written by AI
 import atexit
 import os
 import socket
