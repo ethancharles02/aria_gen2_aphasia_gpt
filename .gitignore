@@ -1,5 +1,5 @@
 # User-Added
-secrets.py
+agpt_secrets.py
 pyvenv.cfg
 
 # Byte-compiled / optimized / DLL files
@@ -20,6 +20,7 @@ downloads/
 eggs/
 .eggs/
 etc/
+include/
 lib/
 lib64
 parts/
