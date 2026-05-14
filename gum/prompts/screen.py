@@ -12,4 +12,4 @@ Include as much relevant detail as possible, but remain concise.
 
 Generate a handful of bullet points and reference *specific* actions the user is taking.
 
-Keep in mind that that the content on the screen is what the user is viewing. It may not be what the user is actively doing or what they believe, so practice caution when making assumptions."""
+Keep in mind that the content on the screen is what the user is viewing. It may not be what the user is actively doing or what they believe, so practice caution when making assumptions."""

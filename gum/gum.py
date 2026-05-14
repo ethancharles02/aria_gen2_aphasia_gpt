@@ -102,7 +102,7 @@ class gum:
         self.audit_prompt = audit_prompt or AUDIT_PROMPT
 
         self.client = AsyncOpenAI(
-            base_url=api_base or os.getenv("GUM_LM_API_BASE"), 
+            base_url=api_base or os.getenv("GUM_LM_API_BASE"),
             api_key=api_key or os.getenv("GUM_LM_API_KEY") or os.getenv("OPENAI_API_KEY") or "None"
         )
 
@@ -127,7 +127,7 @@ class gum:
         """Start the asynchronous update loop for processing observer updates."""
         if self._loop_task is None:
             self._loop_task = asyncio.create_task(self._update_loop())
-            
+
         # Start batch processing if enabled
         if self._batch_task is None:
             self._batch_task = asyncio.create_task(self._batch_processing_loop())
@@ -141,7 +141,7 @@ class gum:
             except asyncio.CancelledError:
                 pass
             self._loop_task = None
-            
+
         # Stop batch processing if enabled
         if self._batch_task:
             self._batch_task.cancel()
@@ -150,7 +150,7 @@ class gum:
             except asyncio.CancelledError:
                 pass
             self._batch_task = None
-            
+
         if self.batcher:
             await self.batcher.stop()
 
@@ -163,22 +163,22 @@ class gum:
 
     async def __aenter__(self):
         """Async context manager entry point.
-        
+
         Returns:
             gum: The instance of the gum class.
         """
         await self.connect_db()
         self.start_update_loop()
-        
+
         # Start batcher if enabled
         if self.batcher:
             await self.batcher.start()
-            
+
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
         """Async context manager exit point.
-        
+
         Args:
             exc_type: The type of exception if any.
             exc: The exception instance if any.
@@ -192,7 +192,7 @@ class gum:
 
     async def _update_loop(self):
         """Efficiently wait for any observer to produce an Update and dispatch it.
-        
+
         This method continuously monitors all observers for updates and processes them
         through the semaphore-guarded handler.
         """
@@ -218,7 +218,7 @@ class gum:
             try:
                 # Wait for the batch interval
                 await asyncio.sleep(self.batch_interval_minutes * 60)
-                
+
                 # Get pending observations
                 batch = self.batcher.pop_batch()
                 if batch:
@@ -228,7 +228,7 @@ class gum:
                         await self._process_batch(batch)
                 else:
                     self.logger.debug("No observations to process in this batch")
-                    
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -239,25 +239,25 @@ class gum:
         """Process a batch of observations together to reduce API calls."""
         if not batched_observations:
             return
-            
+
         self.logger.info(f"Processing {len(batched_observations)} observations in batch")
-        
+
         # Combine all observations into a single content for analysis
         combined_content = []
         observation_ids = []
-        
+
         for obs in batched_observations:
             combined_content.append(f"[{obs['observer_name']}] {obs['content']}")
             observation_ids.append(obs['id'])
-            
+
         combined_text = "\n\n".join(combined_content)
-        
+
         # Create a combined update
         combined_update = Update(
             content=combined_text,
             content_type="input_text"
         )
-        
+
         try:
             async with self._session() as session:
                 # Create observations in database
@@ -270,9 +270,9 @@ class gum:
                     )
                     session.add(observation)
                     observations.append(observation)
-                
+
                 await session.flush()
-                
+
                 # Process the combined content
                 pool = await self._generate_and_search(session, combined_update)
                 identical, similar, different = await self._filter_propositions(pool)
@@ -281,10 +281,10 @@ class gum:
                 await self._handle_identical(session, identical, observations)
                 await self._handle_similar(session, similar, observations)
                 await self._handle_different(session, different, observations)
-                
+
                 # Observations are already removed from queue by pop_batch()
                 self.logger.info(f"Completed processing batch of {len(batched_observations)} observations")
-                
+
         except Exception as e:
             self.logger.error(f"Error processing batch: {e}")
             self.logger.error(f"Traceback: {traceback.format_exc()}")
@@ -298,10 +298,10 @@ class gum:
 
     async def _construct_propositions(self, update: Update) -> list[PropositionItem]:
         """Generate propositions from an update.
-        
+
         Args:
             update (Update): The update to generate propositions from.
-            
+
         Returns:
             list[PropositionItem]: List of generated propositions.
         """
@@ -321,10 +321,10 @@ class gum:
 
     async def _build_relation_prompt(self, all_props) -> str:
         """Build a prompt for analyzing relationships between propositions.
-        
+
         Args:
             all_props: List of propositions to analyze.
-            
+
         Returns:
             str: The formatted prompt for relationship analysis.
         """
@@ -339,10 +339,10 @@ class gum:
         self, rel_props: list[Proposition]
     ) -> tuple[list[Proposition], list[Proposition], list[Proposition]]:
         """Filter propositions into identical, similar, and unrelated groups.
-        
+
         Args:
             rel_props (list[Proposition]): List of propositions to filter.
-            
+
         Returns:
             tuple[list[Proposition], list[Proposition], list[Proposition]]: Three lists containing
                 identical, similar, and unrelated propositions respectively.
@@ -393,11 +393,11 @@ class gum:
         self, similar: List[Proposition], related_obs: List[Observation]
     ) -> str:
         """Build the body text for proposition revision.
-        
+
         Args:
             similar (List[Proposition]): List of similar propositions.
             related_obs (List[Observation]): List of related observations.
-            
+
         Returns:
             str: The formatted body text for revision.
         """
@@ -416,11 +416,11 @@ class gum:
         similar_cluster: list[Proposition],
     ) -> list[dict]:
         """Revise propositions based on related observations and similar propositions.
-        
+
         Args:
             related_obs (list[Observation]): List of related observations.
             similar_cluster (list[Proposition]): List of similar propositions.
-            
+
         Returns:
             list[dict]: List of revised propositions.
         """
@@ -429,7 +429,7 @@ class gum:
         rsp = await self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
-            response_format=get_schema(PropositionSchema.model_json_schema()), 
+            response_format=get_schema(PropositionSchema.model_json_schema()),
         )
         return json.loads(rsp.choices[0].message.content)["propositions"]
 
@@ -460,7 +460,7 @@ class gum:
                     enable_mmr=False,
                     enable_decay=True
                 )
-                
+
             for prop, _score in hits:
                 pool[prop.id] = prop
 
@@ -500,11 +500,11 @@ class gum:
 
         # Generate revised propositions
         revised_items = await self._revise_propositions(list(rel_obs), similar)
-        
+
         # Delete all old similar propositions
         for prop in similar:
             await session.delete(prop)
-        
+
         # Create new propositions to replace them
         revision_group = str(uuid4())
         for item in revised_items:
@@ -611,7 +611,7 @@ class gum:
 
     def add_observer(self, observer: Observer):
         """Add an observer to track user behavior.
-        
+
         Args:
             observer (Observer): The observer to add.
         """
@@ -619,7 +619,7 @@ class gum:
 
     def remove_observer(self, observer: Observer):
         """Remove an observer from tracking.
-        
+
         Args:
             observer (Observer): The observer to remove.
         """
@@ -628,7 +628,7 @@ class gum:
 
     def register_update_handler(self, fn: Callable[[Observer, Update], None]):
         """Register a custom update handler function.
-        
+
         Args:
             fn (Callable[[Observer, Update], None]): The handler function to register.
         """
@@ -644,14 +644,14 @@ class gum:
         end_time: datetime | None = None,
     ) -> list[tuple[Proposition, float]]:
         """Query the database for propositions matching the user query.
-        
+
         Args:
             user_query (str): The query string to search for.
             limit (int, optional): Maximum number of results to return. Defaults to 3.
             mode (str, optional): Search mode ("OR" or "AND"). Defaults to "OR".
             start_time (datetime, optional): Start time for filtering results. Defaults to None.
             end_time (datetime, optional): End time for filtering results. Defaults to None.
-            
+
         Returns:
             list[tuple[Proposition, float]]: List of tuples containing propositions and their relevance scores.
         """
