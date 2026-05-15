@@ -199,6 +199,10 @@ class AriaImager(Imager):
         self.data_queue = data_queue
 
     async def get_image(self):
+        # TODO it might be worth looking into observing the quality of this image somehow and
+        # requesting another one if it is bad. Everything else takes a while to run so this wouldn't
+        # add much time relatively
+        # TODO Pipe in the eyegaze data and visualize it in the image somehow. Add that to the prompt
         await self.request_queue.put(0)
         data = await self.data_queue.get()
         return data
@@ -342,7 +346,11 @@ async def main():
                 "qwen3.5-text",
                 image_observer,
                 api_base="http://localhost:11434/v1",
-                api_key="EMPTY"
+                api_key="EMPTY",
+                propose_prompt=PROPOSE_PROMPT,
+                similar_prompt=SIMILAR_PROMPT,
+                revise_prompt=REVISE_PROMPT,
+                audit_prompt=AUDIT_PROMPT,
             ) as gum_instance:
                 await asyncio.sleep(60 * 30)
 
