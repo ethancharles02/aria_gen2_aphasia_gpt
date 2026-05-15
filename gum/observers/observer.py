@@ -27,12 +27,16 @@ class Observer(ABC):
         # running flag + background task handle
         self._running = True
         self._task: asyncio.Task | None = asyncio.create_task(self._worker_wrapper())
+        # whether the owner (gum) is currently processing an update produced by this observer. When
+        # True the observer should avoid producing additional captures until the owner finishes
+        # handling the update.
+        self._owner_processing: bool = False
 
     # ─────────────────────────────── abstract worker
     @abstractmethod
     async def _worker(self) -> None:     # subclasses override
         """Main worker method that must be implemented by subclasses.
-        
+
         This method should contain the main logic for the observer, such as monitoring
         user interactions or collecting data. It runs in a background task and should
         continue running until the observer is stopped.
@@ -42,7 +46,7 @@ class Observer(ABC):
     # wrapper plugs running flag + exception handling
     async def _worker_wrapper(self) -> None:
         """Wrapper for the worker method that handles exceptions and cleanup.
-        
+
         This method ensures proper cleanup of resources when the worker stops,
         whether due to normal termination or an exception.
         """
@@ -59,15 +63,24 @@ class Observer(ABC):
     @property
     def name(self) -> str:
         """Get the name of the observer.
-        
+
         Returns:
             str: The observer's name.
         """
         return self._name
 
+    @property
+    def owner_processing(self) -> bool:
+        """True when the owner (gum) is processing an update from this observer."""
+        return getattr(self, "_owner_processing", False)
+
+    @owner_processing.setter
+    def owner_processing(self, value: bool) -> None:
+        self._owner_processing = bool(value)
+
     async def get_update(self):
         """Get the next update from the queue if available.
-        
+
         Returns:
             Optional[Update]: The next update from the queue, or None if the queue is empty.
         """
@@ -78,7 +91,7 @@ class Observer(ABC):
 
     async def stop(self) -> None:
         """Stop the observer and clean up resources.
-        
+
         This method cancels the worker task and drains the update queue.
         """
         if self._task and not self._task.done():

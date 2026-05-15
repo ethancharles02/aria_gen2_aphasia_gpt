@@ -285,7 +285,7 @@ def setup_streaming_receiver(record_to_vrs: bool, request_queue: asyncio.Queue, 
         stream_receiver.record_to_vrs(record_to_vrs)
 
     # Register callbacks for each type of data
-    stream_receiver.register_rgb_callback(image_callback_factory(True, asyncio.get_running_loop(), request_queue, data_queue))
+    stream_receiver.register_rgb_callback(image_callback_factory(False, asyncio.get_running_loop(), request_queue, data_queue))
     stream_receiver.register_audio_callback(audio_callback)
     # stream_receiver.register_eye_gaze_callback(eyegaze_callback)
 
@@ -351,6 +351,7 @@ async def main():
                 similar_prompt=SIMILAR_PROMPT,
                 revise_prompt=REVISE_PROMPT,
                 audit_prompt=AUDIT_PROMPT,
+                use_batching=False
             ) as gum_instance:
                 await asyncio.sleep(60 * 30)
 

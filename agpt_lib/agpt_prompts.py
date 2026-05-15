@@ -116,8 +116,8 @@ Return your results in this exact JSON format:
     {
       "proposition": "[Insert your proposition here]",
       "reasoning": "[Provide detailed evidence from specific parts of the transcriptions to clearly justify this proposition. Refer explicitly to named entities where applicable.]",
-      "confidence": "[Confidence score (1–10)]",
-      "decay": "[Decay score (1–10)]"
+      "confidence": "[Confidence score (1-10)]",
+      "decay": "[Decay score (1-10)]"
     },
     ...
   ]
@@ -143,17 +143,17 @@ When editing, **retain or introduce references to specific named entities** from
 
 Edge cases to handle:
 
-- **Contradictions** – If two propositions conflict, keep the one with stronger supporting evidence, or merge them into a conditional statement. Lower the confidence score of weaker or uncertain claims.
-- **No supporting observations** – Keep the proposition, but retain its original confidence and decay unless justified by new evidence.
-- **Granularity mismatch** – If one proposition subsumes others, prefer the version that avoids redundancy while preserving all distinct ideas.
-- **Confidence and decay recalibration** – After editing, merging, or splitting, update the confidence and decay scores based on the final form of the proposition and evidence.
+- **Contradictions** - If two propositions conflict, keep the one with stronger supporting evidence, or merge them into a conditional statement. Lower the confidence score of weaker or uncertain claims.
+- **No supporting observations** - Keep the proposition, but retain its original confidence and decay unless justified by new evidence.
+- **Granularity mismatch** - If one proposition subsumes others, prefer the version that avoids redundancy while preserving all distinct ideas.
+- **Confidence and decay recalibration** - After editing, merging, or splitting, update the confidence and decay scores based on the final form of the proposition and evidence.
 
 General guidelines:
 
-- Keep each proposition clear and concise (typically 1–2 sentences).
+- Keep each proposition clear and concise (typically 1-2 sentences).
 - Maintain all meaningful content from the originals.
 - Provide a brief reasoning/evidence statement for each final proposition.
-- Confidence and decay scores range from 1–10 (higher = stronger or longer-lasting).
+- Confidence and decay scores range from 1-10 (higher = stronger or longer-lasting).
 
 ## Evaluation Criteria
 
@@ -211,9 +211,9 @@ SIMILAR_PROMPT = """You will label sets of propositions based on how similar the
 
 Use exactly these labels:
 
-(A) IDENTICAL – The propositions say practically the same thing.
-(B) SIMILAR   – The propositions relate to a similar idea or topic.
-(C) UNRELATED – The propositions are fundamentally different.
+(A) IDENTICAL - The propositions say practically the same thing.
+(B) SIMILAR   - The propositions relate to a similar idea or topic.
+(C) UNRELATED - The propositions are fundamentally different.
 
 Always refer to propositions by their numeric IDs.
 

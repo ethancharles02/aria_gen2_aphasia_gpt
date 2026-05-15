@@ -72,6 +72,7 @@ class gum:
         api_key: str | None = None,
         batch_interval_minutes: float = 2,
         max_batch_size: int = 50,
+        use_batching: bool = True,
     ):
         # basic paths
         data_directory = os.path.expanduser(data_directory)
@@ -86,6 +87,7 @@ class gum:
         # batching configuration
         self.batch_interval_minutes = batch_interval_minutes
         self.max_batch_size = max_batch_size
+        self.use_batching = use_batching
 
         # logging
         self.logger = logging.getLogger("gum")
@@ -129,7 +131,7 @@ class gum:
             self._loop_task = asyncio.create_task(self._update_loop())
 
         # Start batch processing if enabled
-        if self._batch_task is None:
+        if self.use_batching and self._batch_task is None:
             self._batch_task = asyncio.create_task(self._batch_processing_loop())
 
     async def stop_update_loop(self):
@@ -171,7 +173,7 @@ class gum:
         self.start_update_loop()
 
         # Start batcher if enabled
-        if self.batcher:
+        if self.use_batching and self.batcher:
             await self.batcher.start()
 
         return self
@@ -210,7 +212,24 @@ class gum:
                 upd: Update = fut.result()
                 obs = gets[fut]
 
-                asyncio.create_task(self._default_handler(obs, upd))
+                # mark observer as being processed by the owner while we hand its update to the handler
+                if not self.use_batching:
+                    try:
+                        obs.owner_processing = True
+                    except Exception:
+                        pass
+
+                task = asyncio.create_task(self._default_handler(obs, upd))
+
+                if not self.use_batching:
+                    # when the handler finishes, clear the owner-processing flag
+                    def _clear_busy(t, o=obs):
+                        try:
+                            o.owner_processing = False
+                        except Exception:
+                            pass
+
+                    task.add_done_callback(_clear_busy)
 
     async def _batch_processing_loop(self):
         """Process batched observations periodically to reduce API calls."""
@@ -586,13 +605,24 @@ class gum:
     async def _default_handler(self, observer: Observer, update: Update) -> None:
         self.logger.info(f"Processing update from {observer.name}")
 
-        # add to batch
-        observation_id = self.batcher.push(
-            observer_name=observer.name,
-            content=update.content,
-            content_type=update.content_type
-        )
-        self.logger.info(f"Added observation {observation_id} to queue (size: {self.batcher.size()})")
+        if self.use_batching:
+            observation_id = self.batcher.push(
+                observer_name=observer.name,
+                content=update.content,
+                content_type=update.content_type
+            )
+            self.logger.info(f"Added observation {observation_id} to queue (size: {self.batcher.size()})")
+        else:
+            self.logger.info(f"Processing single observation immediately for {observer.name}")
+            await self._process_batch([
+                {
+                    'id': str(uuid4()),
+                    'observer_name': observer.name,
+                    'content': update.content,
+                    'content_type': update.content_type,
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                }
+            ])
 
     @asynccontextmanager
     async def _session(self):

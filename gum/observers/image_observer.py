@@ -230,6 +230,12 @@ class ImageObserver(Observer):
             """Process pending event and emit update."""
             if self._pending_event is None:
                 return
+            # If gum is already processing a previous update for this observer, don't capture or
+            # emit new images now — reschedule the flush to try again after the debounce window.
+            if self.owner_processing:
+                if not self._debounce_handle:
+                    self._debounce_handle = loop.call_later(DEBOUNCE, debounce_flush)
+                return
 
             ev = self._pending_event
             aft = await self.imager.get_image()
@@ -240,34 +246,50 @@ class ImageObserver(Observer):
             await self._process_and_emit(ev["before"], aft)
 
             self._pending_event = None
+            # debounce timer has fired and been flushed; clear handle so future events can schedule
+            # a new debounce timer.
+            self._debounce_handle = None
 
         def debounce_flush():
             """Schedule flush as a task."""
             asyncio.create_task(flush())
 
         async def send_data():
-            # skip if we already have a pending event being processed
-            # (this discards intermediate frames and keeps only the latest)
-            if self._pending_event is not None:
+            # Skip if we already have a pending event being processed (this discards intermediate
+            # frames and keeps only the latest) grab the latest frame and set pending if not already
+            # set
+            if self._pending_event is None:
+                async with self._frame_lock:
+                    bf = self._frame
+                if bf is None:
+                    return
+                self._pending_event = {"before": bf}
+
+            # If gum is currently processing this observer's previous update, skip scheduling new
+            # flushes until it's finished.
+            if self.owner_processing:
                 return
 
-            # grab the latest frame
-            async with self._frame_lock:
-                bf = self._frame
-            if bf is None:
-                return
-            self._pending_event = {"before": bf}
-
-            # schedule debounce timer only if not already scheduled
-            if not self._debounce_handle:
-                self._debounce_handle = loop.call_later(DEBOUNCE, debounce_flush)
+            # reset debounce timer so each new frame extends the window
+            if self._debounce_handle:
+                try:
+                    self._debounce_handle.cancel()
+                except Exception:
+                    pass
+            self._debounce_handle = loop.call_later(DEBOUNCE, debounce_flush)
 
         # ---- main capture loop ----
         log.info(f"Image observer started")
 
         i = 0
-        while self._running:                         # flag from base class
+        while self._running:
             t0 = time.time()
+
+            # Don't capture frames while gum is processing this observer's previous update; wait and
+            # loop again.
+            if self.owner_processing:
+                await asyncio.sleep(0.1)
+                continue
 
             async with self._frame_lock:
                 self._frame = await self.imager.get_image()
@@ -282,3 +304,4 @@ class ImageObserver(Observer):
         # shutdown
         if self._debounce_handle:
             self._debounce_handle.cancel()
+            self._debounce_handle = None
