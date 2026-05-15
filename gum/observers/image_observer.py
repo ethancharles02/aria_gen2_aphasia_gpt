@@ -10,6 +10,7 @@ import os
 import time
 from collections import deque
 from typing import Optional
+from openai import OpenAI
 
 import asyncio
 
@@ -17,11 +18,10 @@ import asyncio
 from PIL import Image
 
 # — Local —
-from .observer import Observer
-from ..schemas import Update
+from ..imagers.imager import Imager
 from ..prompts.screen import TRANSCRIPTION_PROMPT, SUMMARY_PROMPT
-from ..models.vision_model import VisionModel, base64_encode_image
-from ..models.vision_qwen35_9b import Qwen35_9b
+from ..schemas import Update
+from .observer import Observer
 
 ###############################################################################
 # Screen observer                                                             #
@@ -59,14 +59,16 @@ class ImageObserver(Observer):
     # ─────────────────────────────── construction
     def __init__(
         self,
-        vision_model: VisionModel = Qwen35_9b(),
+        vision_model: str = "qwen3.5-vision",
+        imager: Imager = None,
         images_dir: str = "~/.cache/gum/images",
-        transcription_prompt: Optional[str] = None,
-        summary_prompt: Optional[str] = None,
+        transcription_prompt: str = TRANSCRIPTION_PROMPT,
+        summary_prompt: str = SUMMARY_PROMPT,
         history_k: int = 10,
         debug: bool = False,
         api_key: str | None = None,
         api_base: str | None = None,
+        save_images: bool = False
     ) -> None:
         """Initialize the Screen observer.
 
@@ -85,10 +87,12 @@ class ImageObserver(Observer):
         self.images_dir = os.path.abspath(os.path.expanduser(images_dir))
         os.makedirs(self.images_dir, exist_ok=True)
 
-        self.transcription_prompt = transcription_prompt or TRANSCRIPTION_PROMPT
-        self.summary_prompt = summary_prompt or SUMMARY_PROMPT
+        self.transcription_prompt = transcription_prompt
+        self.summary_prompt = summary_prompt
         self.vision_model = vision_model
-        self.vision_model.setup()
+        self.client = OpenAI(base_url=api_base, api_key=api_key)
+        self.imager = imager
+        self.save_images = save_images
 
         self.debug = debug
 
@@ -104,7 +108,7 @@ class ImageObserver(Observer):
         super().__init__()
 
     # ─────────────────────────────── OpenAI Vision (async)
-    async def _call_vision_model(self, prompt: str, img_paths: list[str]) -> str:
+    async def _call_vision_model(self, prompt: str, img_strs: list[str]) -> str:
         """Call Vision model to analyze images.
 
         Args:
@@ -114,24 +118,46 @@ class ImageObserver(Observer):
         Returns:
             str: Vision Model's analysis of the images.
         """
-        self.vision_model.set_instructions(prompt)
-        # Encode all images for comparison
-        if not img_paths:
+        if self.client is None:
+            print(f"{self.__class__.__str__}WARNING: Attempted to generate a response without setting up client first")
+
+        if not img_strs:
             return "[no images provided]"
 
-        encoded = await asyncio.gather(
-            *[asyncio.to_thread(base64_encode_image, p) for p in img_paths]
-        )
+        content = [
+            *[{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image}"}} for image in img_strs],
+            {
+                "type": "text",
+                "text": prompt
+            }
+        ]
 
-        # Try to send all images together, fall back to first image if it fails
-        return self.vision_model.generate_response({}, encoded)
+        messages = [
+            {
+                "role": "user",
+                "content": content
+            }
+        ]
+        chat_response = self.client.chat.completions.create(
+            model=self.vision_model,
+            messages=messages,
+            extra_body={
+                "chat_template_kwargs": {"enable_thinking": False}
+            },
+        )
+        answer = chat_response.choices[0].message.content
+        # TODO This isn't a valid production setup. Handle it better
+        if not answer:
+            raise RuntimeError("Something went wrong with the model and it didn't produce a message")
+        return answer
+
 
     # ─────────────────────────────── I/O helpers
-    async def _save_frame(self, frame_path: str, tag: str) -> str:
+    def _save_frame(self, frame_data: str, tag: str) -> str:
         """Save a frame as a JPEG image.
 
         Args:
-            frame_path (str): Path to the frame image.
+            frame_data (str): Base64 frame data
             tag (str): Tag to include in the filename.
 
         Returns:
@@ -139,38 +165,30 @@ class ImageObserver(Observer):
         """
         ts   = f"{time.time():.5f}"
         path = os.path.join(self.images_dir, f"{ts}_{tag}.jpg")
-        # Copy/cache the frame, converting to RGB if needed
-        def save_image():
-            img = Image.open(frame_path)
-            # Convert RGBA to RGB for JPEG compatibility
-            if img.mode in ('RGBA', 'LA', 'P'):
-                rgb_img = Image.new('RGB', img.size, (255, 255, 255))
-                rgb_img.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
-                rgb_img.save(path, "JPEG", quality=70)
-            else:
-                img.save(path, "JPEG", quality=70)
+        frame_data = base64.b64decode(frame_data)
+        with open(path, "wb") as f:
+            f.write(frame_data)
 
-        await asyncio.to_thread(save_image)
         return path
 
-    async def _process_and_emit(self, before_path: str, after_path: str) -> None:
+    async def _process_and_emit(self, before_img: str, after_img: str) -> None:
         """Process screenshots and emit an update.
 
         Args:
-            before_path (str): Path to the "before" screenshot.
-            after_path (str | None): Path to the "after" screenshot, if any.
+            before_img (str): Base64 "before" screenshot.
+            after_img (str | None): Base64 "after" screenshot, if any.
         """
         # chronology: append 'before' first (history order == real order)
-        self._history.append(before_path)
+        self._history.append(before_img)
         prev_paths = list(self._history)
 
         # async OpenAI calls
         try:
-            transcription = await self._call_vision_model(self.transcription_prompt, [before_path, after_path])
+            transcription = await self._call_vision_model(self.transcription_prompt, [before_img, after_img])
         except Exception as exc:
             transcription = f"[transcription failed: {exc}]"
 
-        prev_paths.append(after_path)
+        prev_paths.append(after_img)
         try:
             summary = await self._call_vision_model(self.summary_prompt, prev_paths)
             # summary = await self._call_vision_model("Give a short summary of the differences between the images provided", prev_paths)
@@ -214,11 +232,12 @@ class ImageObserver(Observer):
                 return
 
             ev = self._pending_event
-            aft = "./testing/after.png"
+            aft = await self.imager.get_image()
 
-            bef_path = await self._save_frame(ev["before"], "before")
-            aft_path = await self._save_frame(aft, "after")
-            await self._process_and_emit(bef_path, aft_path)
+            if self.save_images:
+                bef_path = self._save_frame(ev["before"], "before")
+                aft_path = self._save_frame(aft, "after")
+            await self._process_and_emit(ev["before"], aft)
 
             self._pending_event = None
 
@@ -251,7 +270,7 @@ class ImageObserver(Observer):
             t0 = time.time()
 
             async with self._frame_lock:
-                self._frame = "./testing/before.png" if i % 2 == 0 else "./testing/after.png"
+                self._frame = await self.imager.get_image()
 
             await send_data()
             i += 1
@@ -263,16 +282,3 @@ class ImageObserver(Observer):
         # shutdown
         if self._debounce_handle:
             self._debounce_handle.cancel()
-
-
-def test_image_observer():
-    import asyncio
-
-    async def test():
-        observer = ImageObserver()
-        update = await observer.update_queue.get()
-        print(f"\n=== UPDATE RECEIVED ===\n{update.content}\n")
-        observer._running = False
-        await asyncio.sleep(0.5)  # Allow worker to finish
-
-    asyncio.run(test())

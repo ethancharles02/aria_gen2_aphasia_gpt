@@ -41,8 +41,8 @@
       "threshold": 60,
       "windowMs": 400
     },
-    "width": 1200,
-    "height": 900
+    "width": 2000,
+    "height": 1500
   },
   "et": {
     "rateHz": 30

@@ -16,12 +16,12 @@ STREAM_CONFIG_NAME = "agpt_lib/agpt_streaming.json"
 # Amount of time to batch messages to send over the network. For Wi-Fi streaming, this should be
 # around 200 to prevent overheating (see
 # https://facebookresearch.github.io/projectaria_tools/gen2/ark/client-sdk/streaming#message-batching)
-STREAM_OVER_WIFI = False
+STREAM_OVER_WIFI = True
 STREAM_BATCH_PERIOD_MS = 200
 
 # --- Debug ---
 # Disables audio transcription and instead shows the temperature
-DISPLAY_TEMPERATURE = False
+DISPLAY_TEMPERATURE = True
 
 # --- Audio Transcription ---
 # See https://github.com/openai/whisper/blob/main/model-card.md

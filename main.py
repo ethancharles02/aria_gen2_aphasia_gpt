@@ -9,6 +9,9 @@
 
 from datetime import datetime, timedelta
 from queue import Empty, Queue
+import asyncio
+import base64
+import cv2
 import numpy as np
 import threading
 import time
@@ -23,6 +26,9 @@ except ImportError:
 
 import aria.stream_receiver as receiver
 import aria.sdk_gen2 as sdk_gen2
+from gum.imagers.imager import Imager
+from gum import gum
+from gum.observers.image_observer import ImageObserver
 from projectaria_tools.core.mps import EyeGaze
 from projectaria_tools.core.sensor_data import (
     AudioData,
@@ -32,6 +38,7 @@ from projectaria_tools.core.sensor_data import (
 )
 
 # For local secret variables
+from agpt_lib.agpt_prompts import *
 from agpt_lib.agpt_secrets import *
 from agpt_lib.aphasia_config import *
 
@@ -184,10 +191,46 @@ def device_streaming() -> sdk_gen2.Device:
     device.start_streaming()
     return device
 
-def image_callback(image_data: ImageData, image_record: ImageDataRecord):
-    print(
-        f"Received image data of size {image_data.to_numpy_array().shape} with timestamp {image_record.capture_timestamp_ns} ns"
-    )
+class AriaImager(Imager):
+    def __init__(self, request_queue, data_queue):
+        super().__init__()
+        self.loop = asyncio.get_running_loop()
+        self.request_queue = request_queue
+        self.data_queue = data_queue
+
+    async def get_image(self):
+        await self.request_queue.put(0)
+        data = await self.data_queue.get()
+        return data
+
+def image_callback_factory(show_live_stream: bool, loop: asyncio.AbstractEventLoop, request_queue: asyncio.Queue, data_queue: asyncio.Queue):
+    def image_callback(image_data: ImageData, image_record: ImageDataRecord):
+        img_arr = None
+        bgr_img = None
+
+        if show_live_stream:
+            img_arr = image_data.to_numpy_array()
+            bgr_img = cv2.cvtColor(img_arr, cv2.COLOR_RGB2BGR)
+            cv2.imshow("Live View", bgr_img)
+            cv2.waitKey(1)
+
+        if not request_queue.empty():
+            if bgr_img is None:
+                img_arr = image_data.to_numpy_array()
+                bgr_img = cv2.cvtColor(img_arr, cv2.COLOR_RGB2BGR)
+
+            success, encoded_image = cv2.imencode(".jpg", bgr_img)
+            if not success:
+                raise RuntimeError("Failed to encode image")
+            base64_str = base64.b64encode(encoded_image).decode()
+
+            async def update_queues():
+                await request_queue.get()
+                await data_queue.put(base64_str)
+
+            asyncio.run_coroutine_threadsafe(update_queues(), loop)
+
+    return image_callback
 
 old_time = time.monotonic()
 def eyegaze_callback(eyegaze_data: EyeGaze):
@@ -226,7 +269,7 @@ def audio_callback(audio_data: AudioData, audio_record: AudioDataRecord, num_cha
         chunk_i16 = (chunk_i16 * 32767.0).astype(np.int16)
         _data_queue.put(chunk_i16.tobytes())
 
-def setup_streaming_receiver(record_to_vrs: bool) -> receiver.StreamReceiver:
+def setup_streaming_receiver(record_to_vrs: bool, request_queue: asyncio.Queue, data_queue: asyncio.Queue) -> receiver.StreamReceiver:
     config = sdk_gen2.HttpServerConfig()
     config.address = "0.0.0.0"
     config.port = 6768
@@ -238,7 +281,7 @@ def setup_streaming_receiver(record_to_vrs: bool) -> receiver.StreamReceiver:
         stream_receiver.record_to_vrs(record_to_vrs)
 
     # Register callbacks for each type of data
-    # stream_receiver.register_rgb_callback(image_callback)
+    stream_receiver.register_rgb_callback(image_callback_factory(True, asyncio.get_running_loop(), request_queue, data_queue))
     stream_receiver.register_audio_callback(audio_callback)
     # stream_receiver.register_eye_gaze_callback(eyegaze_callback)
 
@@ -268,7 +311,7 @@ def temperature_monitor_loop(stop_event: threading.Event, device: sdk_gen2.Devic
     if temp_str is not None:
         print(f"Final temperature: {temp_str}")
 
-if __name__ == "__main__":
+async def main():
     record_to_vrs = ""
 
     # Setup device to start streaming
@@ -282,14 +325,29 @@ if __name__ == "__main__":
         init_whisper_model()
         start_transcription_worker()
 
-    # Setup streaming receiver to receive streaming data with callbacks
-    stream_receiver = setup_streaming_receiver(record_to_vrs)
+    request_queue = asyncio.Queue(1)
+    data_queue = asyncio.Queue(1)
 
+    aria_imager = AriaImager(request_queue, data_queue)
+
+    # Setup streaming receiver to receive streaming data with callbacks
+    stream_receiver = setup_streaming_receiver(record_to_vrs, request_queue, data_queue)
     stream_receiver.start_server()
 
+    image_observer = ImageObserver("qwen3.5-vision", api_key="EMPTY", api_base="http://localhost:11434/v1", imager=aria_imager, save_images=True, transcription_prompt=TRANSCRIPTION_PROMPT, summary_prompt=SUMMARY_PROMPT, history_k=4)
+
     try:
+        async with gum(
+                "Ethan",
+                "qwen3.5-text",
+                image_observer,
+                api_base="http://localhost:11434/v1",
+                api_key="EMPTY"
+            ) as gum_instance:
+                await asyncio.sleep(60 * 30)
+
         # Wait for 10 minutes
-        time.sleep(600)
+        # time.sleep(600)
     except KeyboardInterrupt:
         print("Shutting down streaming")
 
@@ -306,3 +364,6 @@ if __name__ == "__main__":
 
     # Terminate the server
     stream_receiver.stop_server()
+
+if __name__ == "__main__":
+    asyncio.run(main())

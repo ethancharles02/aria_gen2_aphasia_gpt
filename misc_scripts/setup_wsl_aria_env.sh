@@ -42,7 +42,9 @@ install_apt_prereqs() {
     python3-pip \
     libatomic1 \
     network-manager \
-    usbutils
+    usbutils \
+    android-tools-adb \
+    android-tools-fastboot
 }
 
 ensure_new_libstdcpp() {
