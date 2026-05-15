@@ -104,6 +104,8 @@ def stop_transcription_worker() -> None:
     if _worker_thread is not None:
         _worker_thread.join()
 
+# TODO refactor transcription worker into a class and keep it separate
+# TODO research ways to isolate the voice of the person speaking (compare noise level of someone wearing the glasses compared to people nearby)
 def transcription_worker() -> None:
     phrase_time = None
     phrase_bytes = bytes()
@@ -176,6 +178,9 @@ def device_streaming() -> sdk_gen2.Device:
     else:
         streaming_config.profile_name = STREAM_CONFIG_NAME
 
+    # TODO When unplugging the glasses, the program doesn't appear to have good enough support to
+    # switch. The streaming viewer does it though so it may be worth looking into how that handles
+    # the transition
     if STREAM_OVER_WIFI:
         print("Streaming data over Wi-Fi")
         streaming_config.streaming_interface = sdk_gen2.StreamingInterface.WIFI_STA
@@ -334,9 +339,18 @@ async def main():
 
     aria_imager = AriaImager(request_queue, data_queue)
 
+    # TODO Investigate starting the stream without a USB connection (even if it is just through the
+    # phone and connecting after the fact)
+
+    # TODO Refactor Aria handling code into its own class and then make an AphasiaGPT class that
+    # takes in the handler code
+
     # Setup streaming receiver to receive streaming data with callbacks
     stream_receiver = setup_streaming_receiver(record_to_vrs, request_queue, data_queue)
     stream_receiver.start_server()
+
+    # TODO setup hosting so this can be run on the laptop through an API key and port-forwarded IP.
+    # Once that is set up, it should be easily hostable through a school computer
 
     image_observer = ImageObserver("qwen3.5-vision", api_key="EMPTY", api_base="http://localhost:11434/v1", imager=aria_imager, save_images=True, transcription_prompt=TRANSCRIPTION_PROMPT, summary_prompt=SUMMARY_PROMPT, history_k=4)
 
