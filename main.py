@@ -202,14 +202,22 @@ class AriaImager(Imager):
         self.loop = asyncio.get_running_loop()
         self.request_queue = request_queue
         self.data_queue = data_queue
+        self.first_image = True
 
     async def get_image(self):
         # TODO it might be worth looking into observing the quality of this image somehow and
         # requesting another one if it is bad. Everything else takes a while to run so this wouldn't
         # add much time relatively
+        # TODO investigate why the first image is often dark when streaming
         # TODO Pipe in the eyegaze data and visualize it in the image somehow. Add that to the prompt
         await self.request_queue.put(0)
         data = await self.data_queue.get()
+        # This is more of a temporary solution to fix the first image being dark that it takes
+        if self.first_image:
+            self.first_image = False
+            for _ in range(20):
+                await self.get_image()
+            data = await self.get_image()
         return data
 
 def image_callback_factory(show_live_stream: bool, loop: asyncio.AbstractEventLoop, request_queue: asyncio.Queue, data_queue: asyncio.Queue):
@@ -228,7 +236,7 @@ def image_callback_factory(show_live_stream: bool, loop: asyncio.AbstractEventLo
                 img_arr = image_data.to_numpy_array()
                 bgr_img = cv2.cvtColor(img_arr, cv2.COLOR_RGB2BGR)
 
-            success, encoded_image = cv2.imencode(".jpg", bgr_img)
+            success, encoded_image = cv2.imencode(".jpg", bgr_img, [cv2.IMWRITE_JPEG_QUALITY, 95])
             if not success:
                 raise RuntimeError("Failed to encode image")
             base64_str = base64.b64encode(encoded_image).decode()
@@ -352,14 +360,14 @@ async def main():
     # TODO setup hosting so this can be run on the laptop through an API key and port-forwarded IP.
     # Once that is set up, it should be easily hostable through a school computer
 
-    image_observer = ImageObserver("qwen3.5-vision", api_key="EMPTY", api_base="http://localhost:11434/v1", imager=aria_imager, save_images=True, transcription_prompt=TRANSCRIPTION_PROMPT, summary_prompt=SUMMARY_PROMPT, history_k=4)
+    image_observer = ImageObserver("qwen3.5-vision", api_key="EMPTY", api_base="http://localhost:1234/v1", imager=aria_imager, save_images=True, transcription_prompt=TRANSCRIPTION_PROMPT, summary_prompt=SUMMARY_PROMPT, history_k=4)
 
     try:
         async with gum(
                 "Ethan",
-                "qwen3.5-text",
+                "qwen3.5-vision",
                 image_observer,
-                api_base="http://localhost:11434/v1",
+                api_base="http://localhost:1234/v1",
                 api_key="EMPTY",
                 propose_prompt=PROPOSE_PROMPT,
                 similar_prompt=SIMILAR_PROMPT,

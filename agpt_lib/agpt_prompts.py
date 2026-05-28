@@ -123,6 +123,35 @@ Return your results in this exact JSON format:
   ]
 }"""
 
+SIMILAR_PROMPT = """You will label sets of propositions based on how similar they are to eachother.
+
+# Propositions
+
+{body}
+
+# Task
+
+Use exactly these labels:
+
+(A) IDENTICAL - The propositions say practically the same thing.
+(B) SIMILAR   - The propositions relate to a similar idea or topic.
+(C) UNRELATED - The propositions are fundamentally different.
+
+Always refer to propositions by their numeric IDs.
+
+Return **only** JSON in the following format:
+
+{
+  "relations": [
+    {
+      "source": <ID>,
+      "label": "IDENTICAL" | "SIMILAR" | "UNRELATED",
+      "target": [<ID>, ...] // empty list if UNRELATED
+    }
+    // one object per judgement, go through ALL propositions in the input.
+  ]
+}"""
+
 REVISE_PROMPT = """You are an expert analyst. A cluster of similar propositions are shown below, followed by their supporting observations.
 
 Your job is to produce a **final set** of propositions that is clear, non-redundant, and captures everything about the user, {user_name}.
@@ -198,34 +227,5 @@ Return **only** JSON in the following format:
       "decay":       <integer 1-10>
     },
     ...
-  ]
-}"""
-
-SIMILAR_PROMPT = """You will label sets of propositions based on how similar they are to eachother.
-
-# Propositions
-
-{body}
-
-# Task
-
-Use exactly these labels:
-
-(A) IDENTICAL - The propositions say practically the same thing.
-(B) SIMILAR   - The propositions relate to a similar idea or topic.
-(C) UNRELATED - The propositions are fundamentally different.
-
-Always refer to propositions by their numeric IDs.
-
-Return **only** JSON in the following format:
-
-{
-  "relations": [
-    {
-      "source": <ID>,
-      "label": "IDENTICAL" | "SIMILAR" | "UNRELATED",
-      "target": [<ID>, ...] // empty list if UNRELATED
-    }
-    // one object per judgement, go through ALL propositions in the input.
   ]
 }"""

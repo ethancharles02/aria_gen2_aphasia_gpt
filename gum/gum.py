@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+from .models import observation_proposition
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from typing import Callable, List
+from uuid import uuid4
 import asyncio
 import json
 import logging
 import os
-from uuid import uuid4
-from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-from typing import Callable, List
-from .models import observation_proposition
+import time
 import traceback
 
 from openai import AsyncOpenAI
@@ -330,11 +331,14 @@ class gum:
         )
 
         schema = PropositionSchema.model_json_schema()
+        old_time = time.perf_counter()
         rsp = await self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
             response_format=get_schema(schema),
         )
+        print(f"Proposition time: {time.perf_counter() - old_time:0.6f} seconds")
+        print(f"\n\n{json.loads(rsp.choices[0].message.content)['propositions']}\n\n")
 
         return json.loads(rsp.choices[0].message.content)["propositions"]
 
@@ -375,11 +379,14 @@ class gum:
         ]
         prompt_text = await self._build_relation_prompt(payload)
 
+        old_time = time.perf_counter()
         rsp = await self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt_text}],
             response_format=get_schema(RelationSchema.model_json_schema()),
         )
+        print(f"Filtering time: {time.perf_counter() - old_time:0.6f} seconds")
+        print(f"\n\n{rsp.choices[0].message.content}\n\n")
 
         data = RelationSchema.model_validate_json(rsp.choices[0].message.content)
 
@@ -445,11 +452,16 @@ class gum:
         """
         body = await self._build_revision_body(similar_cluster, related_obs)
         prompt = self.revise_prompt.replace("{body}", body)
+
+        old_time = time.perf_counter()
         rsp = await self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
             response_format=get_schema(PropositionSchema.model_json_schema()),
         )
+        print(f"Revising time: {time.perf_counter() - old_time:0.6f} seconds")
+        print(f"\n\n{json.loads(rsp.choices[0].message.content)['propositions']}\n\n")
+
         return json.loads(rsp.choices[0].message.content)["propositions"]
 
     async def _generate_and_search(

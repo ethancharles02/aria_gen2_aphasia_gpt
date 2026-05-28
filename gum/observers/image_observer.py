@@ -141,9 +141,6 @@ class ImageObserver(Observer):
         chat_response = self.client.chat.completions.create(
             model=self.vision_model,
             messages=messages,
-            extra_body={
-                "chat_template_kwargs": {"enable_thinking": False}
-            },
         )
         answer = chat_response.choices[0].message.content
         # TODO This isn't a valid production setup. Handle it better
@@ -182,20 +179,27 @@ class ImageObserver(Observer):
         self._history.append(before_img)
         prev_paths = list(self._history)
 
+        transcription = ""
         # async OpenAI calls
         try:
+            old_time = time.perf_counter()
             transcription = await self._call_vision_model(self.transcription_prompt, [before_img, after_img])
+            print(f"Transcription time: {time.perf_counter() - old_time:0.6f} seconds")
         except Exception as exc:
-            transcription = f"[transcription failed: {exc}]"
+            print(f"[transcription failed: {exc}]")
 
         prev_paths.append(after_img)
+
+        summary = ""
         try:
+            old_time = time.perf_counter()
             summary = await self._call_vision_model(self.summary_prompt, prev_paths)
-            # summary = await self._call_vision_model("Give a short summary of the differences between the images provided", prev_paths)
+            print(f"Summary time: {time.perf_counter() - old_time:0.6f} seconds")
         except Exception as exc:
-            summary = f"[summary failed: {exc}]"
+            print(f"[summary failed: {exc}]")
 
         txt = (transcription + summary).strip()
+        print(f"\n\n{txt}\n\n")
         # txt = (summary).strip()
         await self.update_queue.put(Update(content=txt, content_type="input_text"))
 

@@ -39,8 +39,10 @@ def test_image_observer():
 async def test_gum():
     gum_instance = gum("Ethan", model="qwen3.5-text")
     await gum_instance.connect_db()
-    propositions = await gum_instance.query("")
-    print(propositions[0][0].reasoning)
+    propositions = await gum_instance.query("", limit=100)
+    for proposition in propositions:
+        print(proposition[0].text)
+        print("")
 
 PROMPT = """"""
 
