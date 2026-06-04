@@ -14,11 +14,9 @@ from openai import OpenAI
 
 import asyncio
 
-# import Quartz
-from PIL import Image
-
 # — Local —
 from ..imagers.imager import Imager
+from ..imagers.context_generator import ContextGenerator
 from ..prompts.screen import TRANSCRIPTION_PROMPT, SUMMARY_PROMPT
 from ..schemas import Update
 from .observer import Observer
@@ -68,7 +66,8 @@ class ImageObserver(Observer):
         debug: bool = False,
         api_key: str | None = None,
         api_base: str | None = None,
-        save_images: bool = False
+        save_images: bool = False,
+        context_generators: list[ContextGenerator] = []
     ) -> None:
         """Initialize the Screen observer.
 
@@ -92,6 +91,7 @@ class ImageObserver(Observer):
         self.vision_model = vision_model
         self.client = OpenAI(base_url=api_base, api_key=api_key)
         self.imager = imager
+        self.context_generators = context_generators
         self.save_images = save_images
 
         self.debug = debug
@@ -198,9 +198,15 @@ class ImageObserver(Observer):
         except Exception as exc:
             print(f"[summary failed: {exc}]")
 
-        txt = (transcription + summary).strip()
+        additional_context = []
+        try:
+            for ctx_generator in self.context_generators:
+                additional_context.append(await ctx_generator.get_context())
+        except Exception as exc:
+            print(f"[Additional context generation failed: {exc}]")
+
+        txt = f"Image Transcription: {transcription}\nImage Summary: {summary}\n{"\n".join(additional_context)}".strip()
         print(f"\n\n{txt}\n\n")
-        # txt = (summary).strip()
         await self.update_queue.put(Update(content=txt, content_type="input_text"))
 
     # ─────────────────────────────── main async worker

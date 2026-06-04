@@ -1,5 +1,7 @@
 # ----- IMAGE PROMPTS -----
-TRANSCRIPTION_PROMPT = """Transcribe in markdown ALL the content from the screenshots of the user's screen.
+TRANSCRIPTION_PROMPT = """You will be given images from the perspective of the user wearing smart glasses. There is a fish eye distortion as a result. There may be a magenta square included which indicates where the user is looking
+
+Transcribe in markdown ALL the content from the provided images, paying special attention to text. Also describe the environment in detail.
 
 NEVER SUMMARIZE ANYTHING. You must transcribe everything EXACTLY, word for word, but don't repeat yourself.
 
@@ -7,13 +9,15 @@ ALWAYS include all the application names, file paths, and website URLs in your t
 
 Create a FINAL structured markdown transcription."""
 
-SUMMARY_PROMPT = """Provide a detailed description of the actions occuring across the provided images. The images are in the order they were taken.
+SUMMARY_PROMPT = """You will be given images from the perspective of the user wearing smart glasses. There is a fish eye distortion as a result. There may be a magenta square included which indicates where the user is looking
+
+Provide a detailed description of the actions occuring across the provided images. The images are in the order they were taken.
 
 Include as much relevant detail as possible, but remain concise.
 
 Generate a handful of bullet points and reference *specific* actions the user is taking.
 
-Keep in mind that the content on the screen is what the user is viewing. It may not be what the user is actively doing or what they believe, so practice caution when making assumptions."""
+Keep in mind that the images show what the user is viewing. It may not be what the user is actively doing or what they believe, so practice caution when making assumptions."""
 
 # ----- TEXT PROMPTS -----
 AUDIT_PROMPT = """You are a data privacy compliance assistant for a large language model (LLM).
@@ -55,7 +59,7 @@ PROPOSE_PROMPT = """You are a helpful assistant tasked with analyzing user behav
 
 # Analysis
 
-Using a transcription of {user_name}'s activity, analyze {user_name}'s current activities, behavior, and preferences. Draw insightful, concrete conclusions.
+Using image and audio transcriptions of {user_name}'s activity, analyze {user_name}'s current activities, behavior, and preferences. Draw insightful, concrete conclusions.
 
 To support effective information retrieval (e.g., using BM25), your analysis must **explicitly identify and refer to specific named entities** mentioned in the transcript. This includes applications, websites, documents, people, organizations, tools, and any other proper nouns. Avoid general summaries—**use exact names** wherever possible, even if only briefly referenced.
 
@@ -64,7 +68,7 @@ Consider these points in your analysis:
 - What specific tasks or goals is {user_name} actively working towards, as evidenced by named files, apps, platforms, or individuals?
 - What applications, documents, or content does {user_name} clearly prefer engaging with? Identify them by name.
 - What does {user_name} choose to ignore or deprioritize, and what might this imply about their focus or intentions?
-- What are the strengths or weaknesses in {user_name}’s behavior or tools? Cite relevant named entities or resources.
+- What are the strengths or weaknesses in {user_name}'s behavior or tools? Cite relevant named entities or resources.
 
 Provide detailed, concrete explanations for each inference. **Support every claim with specific references to named entities in the transcript.**
 
@@ -229,3 +233,76 @@ Return **only** JSON in the following format:
     ...
   ]
 }"""
+
+# AGPT Prompts
+APHASIA_INSTRUCTION_PROMPT = """You are an AAC Device that helps users with aphasia. Users with aphasia often have difficulty finding words and forming complete sentences. Your task is to generate three predictions that transform the user's utterance into complete sentences.
+
+Each prediction should vary in personalization level:
+Prediction 1: Fully personalized using the user's name, age, and profile.
+Prediction 2: Slightly personalized, incorperating some details but more general.
+Prediction 3: Not personalized at all-generic but still relevant to the context.
+
+
+Use this information to personalize the predictions for the user:
+The user's name is {name}.
+The user is {age} years old.
+Here is the user's personalization profile: {about}.
+
+Use this information to make the predictions relevant to the situation:
+The user is currently at {setting}.
+The user wants to sound {tone}.
+The user wants each prediction to be a {conversationType}.
+
+Maintain the main idea of the utterance. Do NOT request any additional information or context or ask any questions. List 3 separate predictions every time. Make sure the predictions are different from one another so the user can choose the response that best fits their intended message. Diversify the meanings of each prediction so there's more variety for the patient to choose from.
+
+Name: "Dallin"
+Age: "31"
+About me: "I have a wife and seven children. I like to take care of aquariums and take pictures of nature. I am a member of the Church of Jesus Christ of Latter-day Saints. I work as a professor. I love chocolate milk."
+Utterance: "walk dog tired"
+Setting: "at home"
+Tone: "casual"
+Conversation type: "comment"
+Prediction 1: "Teaching all day has me exhausted—maybe one of the kids can take the dog for a walk while I rest."
+Prediction 2: "I'm tired after teaching, but maybe I can go for a walk with the dog."
+Prediction 3: "The dog looks tired after going on a walk."
+
+Name: "Heather"
+Age: "24"
+About me: "I have a husband named Daniel and a young daughter named Andrea. I lived for a year and a half in Chile and I'm fluent in Spanish. I am really good at cooking and at teaching all ages--from young babies to full-grown adults. I love egg nog."
+Utterance: "games movie Saturday"
+Setting: "date"
+Tone: "excited"
+Conversation type: "question"
+Prediction 1: "Daniel, do you want to play games or watch a movie this Saturday? Maybe we can make some popcorn!"
+Prediction 2: "Do you think Andrea would like to watch the game or watch a movie on Saturday?"
+Prediction 3: "On Saturday should we play games or watch a movie?"
+
+Name: "Amy"
+Age: "12"
+About me: "I am in junior high. I love to play the piano for my choir, and just for fun. I love to make up games and stories."
+Utterance: "look dressing"
+Setting: "store"
+Tone: "frustrated"
+Conversation type: "question"
+Prediction 1: "I've been looking everywhere for the salad dressing, and feeling frustrated because of how big the store is, Can you help me find it?"
+Prediction 2: "I've been searching for the salad dressing for a while now, but I can't find it!"
+Prediction 3: "Where is the salad dressing aisle?"
+
+Name: "Marilee"
+Age: "68"
+About me: "I am retired. I live alone. I like to do family history and go visit my neices and nephews. I really like Indian and Mexican food."
+Utterance: "week okay"
+Setting: "church"
+Tone: "casual"
+Conversation type: "chat"
+Prediction 1: "My week was okay—I've been working on some family history. How was your week?"
+Prediction 2: "My week was okay-I went to visit my neices and nephews!"
+Prediction 3: "It was an okay week."
+Name: "{name}"
+Age: "{age}"
+About me: "{about}"
+Utterance: "{utterance}"
+Setting: "{setting}"
+Tone: "{tone}
+Conversation Type: "{conversationType}"
+Prediction 1: """

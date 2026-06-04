@@ -44,7 +44,8 @@ install_apt_prereqs() {
     network-manager \
     usbutils \
     android-tools-adb \
-    android-tools-fastboot
+    android-tools-fastboot \
+    ffmpeg
 }
 
 ensure_new_libstdcpp() {
@@ -88,7 +89,8 @@ setup_python_env() {
     aiosqlite \
     greenlet \
     persist-queue \
-    python-dotenv
+    python-dotenv \
+    pydub
 
   ARIA_SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/aria"
   deactivate

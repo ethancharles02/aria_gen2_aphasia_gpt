@@ -12,6 +12,7 @@ from projectaria_tools.core.sensor_data import (
     ImageDataRecord,
 )
 
+from .agpt_config import *
 from .aria_glasses_handler import AriaGlassesHandler
 
 class AgptGlassesHandler(AriaGlassesHandler):
@@ -32,6 +33,7 @@ class AgptGlassesHandler(AriaGlassesHandler):
         self.audio_data_queue: Queue[bytes] = audio_data_queue
         self.whisper_sample_rate = whisper_sample_rate
         self.default_audio_sample_rate = default_audio_sample_rate
+        self.num_audio_channels = None
 
     def _image_callback(self, image_data: ImageData, image_record: ImageDataRecord):
         img_arr = None
@@ -74,27 +76,40 @@ class AgptGlassesHandler(AriaGlassesHandler):
         #         print("Eyegaze not detected")
 
     def _audio_callback(self, audio_data: AudioData, audio_record: AudioDataRecord, num_channels: int):
-        raw_samples = np.asarray(audio_data.data, dtype=np.float32)
-        if raw_samples.size == 0:
-            return
+        if self.num_audio_channels is None:
+            self.num_audio_channels = num_channels
 
-        normalized = raw_samples.astype(np.float32, copy=False)
+        if self.num_audio_channels != num_channels:
+            print(f"WARNING: audio data received in inconsistent number of channels (Set {self.num_audio_channels} but received {num_channels})")
 
-        if num_channels > 1 and normalized.size % num_channels == 0:
-            normalized = normalized.reshape(-1, num_channels)[:, 0]
+        # Add single channel audio data to queue
+        self.audio_data_queue.put(self._transform_audio_data(audio_data.data, 1))
 
-        peak = float(np.max(np.abs(normalized))) if normalized.size else 0.0
-        if peak <= 0:
-            return
-        normalized = normalized / peak
+    def _transform_audio_data(self, full_audio_data_bytes: list[int], num_output_channels: int) -> bytes:
+        if self.num_audio_channels is None:
+            print("Number of channels not set, returning empty bytes")
+            return bytes()
 
-        source_sample_rate_hz = self._estimate_sample_rate_hz(audio_record.capture_timestamps_ns)
-        chunk_16k = self._resample_audio(normalized, source_sample_rate_hz)
-        if chunk_16k.size > 0:
-            chunk_i16 = np.clip(chunk_16k, -1.0, 1.0)
-            chunk_i16 = (chunk_i16 * 32767.0).astype(np.int16)
-            # Send data to the transcription worker
-            self.audio_data_queue.put(chunk_i16.tobytes())
+        if num_output_channels > self.num_audio_channels:
+            print("Can't increase number of channels past original")
+            return bytes()
+
+        raw_array = np.array(full_audio_data_bytes, dtype=np.int32)
+
+        spatial_data = raw_array.reshape(-1, self.num_audio_channels)
+
+        d_channels = self.num_audio_channels // num_output_channels
+        leftover = self.num_audio_channels % num_output_channels
+
+        leftover_channel = [] if leftover == 0 else [np.mean(spatial_data[:, self.num_audio_channels-leftover:self.num_audio_channels], axis=1)]
+        channels = [np.mean(spatial_data[:, i * d_channels:(i + 1) * d_channels], axis=1) for i in range(num_output_channels)] + leftover_channel
+
+        # Divides by 255 since whisper expects 16 bit but the aria stream appears to be 24 bit
+        channels = tuple(map(lambda channel: (channel / 255).astype(np.int16), channels))
+
+        output_bytes = np.column_stack(channels)
+
+        return output_bytes.tobytes()
 
     def _estimate_sample_rate_hz(self, capture_timestamps_ns: list[int]) -> int:
         if len(capture_timestamps_ns) < 2:

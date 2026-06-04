@@ -17,15 +17,21 @@ except ImportError:
     print("Whisper is not installed; audio transcription is disabled.")
 
 class TranscriptionWorker:
-    def __init__(self, data_queue: Queue[bytes], whisper_model_name: str, warmup_time_sec: int, phrase_timeout_sec: int):
+    def __init__(self, data_queue: Queue[bytes], whisper_model_name: str, warmup_time_sec: int, phrase_timeout_sec: int, do_print_transcription: bool = True):
         self.whisper = None
+        self.whisper_model_name = whisper_model_name
         self.data_queue: Queue[bytes] = data_queue
+
         self.worker_thread: threading.Thread | None = None
         self.worker_stop_event = threading.Event()
+
         self.transcription_started_at = 0.0
-        self.whisper_model_name = whisper_model_name
         self.warmup_time_sec = warmup_time_sec
         self.phrase_timeout_sec = phrase_timeout_sec
+        self.do_print_transcription = do_print_transcription
+
+        self._transcription_lines = [""]
+        self._in_progress_phrase = ""
 
         global _has_whisper
         if not _has_whisper:
@@ -50,11 +56,17 @@ class TranscriptionWorker:
         if self.worker_thread is not None:
             self.worker_thread.join()
 
+    def clear_transcription(self):
+        self._transcription_lines.clear()
+
+    def get_transcription(self):
+        transcription = "\n".join(self._transcription_lines)
+        return transcription
+
     # TODO research ways to isolate the voice of the person speaking (compare noise level of someone wearing the glasses compared to people nearby)
     def _transcription_worker(self) -> None:
         phrase_time = None
         phrase_bytes = bytes()
-        transcription_lines = [""]
 
         while not self.worker_stop_event.is_set():
             if time.monotonic() - self.transcription_started_at < self.warmup_time_sec:
@@ -97,12 +109,14 @@ class TranscriptionWorker:
                 continue
 
             if phrase_complete:
-                transcription_lines.append(text)
+                self._transcription_lines.append(text)
+                self._in_progress_phrase = ""
             else:
-                transcription_lines[-1] = text
+                self._in_progress_phrase = text
 
-            print("\033c", end="")
-            for line in transcription_lines:
-                print(line)
+            if self.do_print_transcription:
+                print("\033c", end="")
+                print(self.get_transcription())
+                print(self._in_progress_phrase)
 
-            print("", end="", flush=True)
+                print("", end="", flush=True)
