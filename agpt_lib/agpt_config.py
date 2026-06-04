@@ -32,7 +32,6 @@ DISPLAY_TEMPERATURE = True
 # --- Audio Transcription ---
 # See https://github.com/openai/whisper/blob/main/model-card.md
 WHISPER_MODEL_NAME = "base.en"
-WHISPER_SAMPLE_RATE = 16000
 AUDIO_SAMPLE_RATE = 16000
 # How long to transcribe before forcing a phrase end
 PHRASE_TIMEOUT_SEC = 30.0

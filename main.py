@@ -34,12 +34,12 @@ async def main():
         FRAME_DURATION_MS,
         START_TRANSCRIPTION_WINDOW_S,
         START_TRANSCRIPTION_THRESHOLD,
-        True
+        False
         )
     transcription_worker.start_transcription_worker()
     context_generators = [TranscriptionContextGenerator(transcription_worker)]
 
-    handler = AgptGlassesHandler(False, image_request_queue, image_data_queue, asyncio.get_running_loop(), audio_data_queue, AUDIO_SAMPLE_RATE, WHISPER_SAMPLE_RATE)
+    handler = AgptGlassesHandler(False, image_request_queue, image_data_queue, asyncio.get_running_loop(), audio_data_queue, AUDIO_SAMPLE_RATE)
     handler.setup_device(DEVICE_IP, INITIAL_CONNECTION_OVER_WIFI, STREAM_CONFIG_NAME, STREAM_BATCH_PERIOD_MS, STREAMING_IP, STREAM_OVER_WIFI)
     # Setup streaming receiver to receive streaming data with callbacks
     handler.setup_streaming_receiver("", "0.0.0.0", 6768)
