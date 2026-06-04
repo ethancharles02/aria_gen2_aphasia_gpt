@@ -109,7 +109,7 @@ Generate **at least 5 distinct, well-supported propositions** about {user_name},
 
 Be conservative in your confidence estimates. Just because an application appears on {user_name}'s screen does not mean they have deeply engaged with it. They may have only glanced at it for a second, making it difficult to draw strong conclusions.
 
-Assign high confidence scores (e.g., 8-10) only when the transcriptions provide explicit, direct evidence that {user_name} is actively engaging with the content in a meaningful way. Keep in mind that that the content on the screen is what the user is viewing. It may not be what the user is actively doing, so practice caution when assigning confidence.
+Assign high confidence scores (e.g., 8-10) only when the transcriptions provide explicit, direct evidence that {user_name} is actively engaging with the content in a meaningful way. Keep in mind that the content on the screen is what the user is viewing. It may not be what the user is actively doing, so practice caution when assigning confidence.
 
 Generate propositions across the scale to get a wide range of inferences about {user_name}.
 
@@ -127,7 +127,7 @@ Return your results in this exact JSON format:
   ]
 }"""
 
-SIMILAR_PROMPT = """You will label sets of propositions based on how similar they are to eachother.
+SIMILAR_PROMPT = """You will label sets of propositions based on how similar they are to each other.
 
 # Propositions
 
@@ -218,7 +218,7 @@ Score: **1 (short-lived)** to **10 (long-term relevance or behavioral pattern)**
 
 # Output
 
-Assign high confidence scores (e.g., 8-10) only when the transcriptions provide explicit, direct evidence that {user_name} is actively engaging with the content in a meaningful way. Keep in mind that that the input is what the {user_name} is viewing. It may not be what the {user_name} is actively doing, so practice caution when assigning confidence.
+Assign high confidence scores (e.g., 8-10) only when the transcriptions provide explicit, direct evidence that {user_name} is actively engaging with the content in a meaningful way. Keep in mind that the input is what the {user_name} is viewing. It may not be what the {user_name} is actively doing, so practice caution when assigning confidence.
 
 Return **only** JSON in the following format:
 
