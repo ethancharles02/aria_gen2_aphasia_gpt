@@ -34,5 +34,16 @@ DISPLAY_TEMPERATURE = True
 WHISPER_MODEL_NAME = "base.en"
 WHISPER_SAMPLE_RATE = 16000
 AUDIO_SAMPLE_RATE = 16000
-PHRASE_TIMEOUT_SEC = 3.0
+# How long to transcribe before forcing a phrase end
+PHRASE_TIMEOUT_SEC = 30.0
 TRANSCRIPTION_WARMUP_SEC = 3.0
+# Confidence of no speech within threshold time (ie. this percent of samples didn't have speech detected)
+SR_THRESHOLD = 0.95
+# Threshold of time in seconds
+SR_THRESHOLD_TIME = 2
+# Can be 10, 20, or 30 milliseconds
+FRAME_DURATION_MS = 30
+# Time to look back to decide if speaking has started
+START_TRANSCRIPTION_WINDOW_S = 0.5
+# Threshold of frames that were detected as speech in the window
+START_TRANSCRIPTION_THRESHOLD = 0.7

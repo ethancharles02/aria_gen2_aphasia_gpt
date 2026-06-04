@@ -23,16 +23,14 @@ class AgptGlassesHandler(AriaGlassesHandler):
             image_data_queue: asyncio.Queue,
             event_loop: asyncio.AbstractEventLoop,
             audio_data_queue: Queue[bytes],
-            default_audio_sample_rate: int,
-            whisper_sample_rate: int):
+            audio_sample_rate: int):
         super().__init__()
         self.show_live_stream: bool = show_live_stream
         self.image_request_queue: asyncio.Queue = image_request_queue
         self.image_data_queue: asyncio.Queue = image_data_queue
         self.event_loop: asyncio.AbstractEventLoop = event_loop
         self.audio_data_queue: Queue[bytes] = audio_data_queue
-        self.whisper_sample_rate = whisper_sample_rate
-        self.default_audio_sample_rate = default_audio_sample_rate
+        self.audio_sample_rate = audio_sample_rate
         self.num_audio_channels = None
 
     def _image_callback(self, image_data: ImageData, image_record: ImageDataRecord):
@@ -110,33 +108,3 @@ class AgptGlassesHandler(AriaGlassesHandler):
         output_bytes = np.column_stack(channels)
 
         return output_bytes.tobytes()
-
-    def _estimate_sample_rate_hz(self, capture_timestamps_ns: list[int]) -> int:
-        if len(capture_timestamps_ns) < 2:
-            return self.default_audio_sample_rate
-
-        timestamps = np.asarray(capture_timestamps_ns, dtype=np.int64)
-        deltas = np.diff(timestamps)
-        deltas = deltas[deltas > 0]
-        if deltas.size == 0:
-            return self.default_audio_sample_rate
-
-        estimated_rate = int(round(1e9 / float(np.median(deltas))))
-        if estimated_rate < 8000 or estimated_rate > 96000:
-            return self.default_audio_sample_rate
-        return estimated_rate
-
-    def _resample_audio(self, audio: np.ndarray, source_sample_rate_hz: int) -> np.ndarray:
-        if audio.size == 0:
-            return audio
-        if source_sample_rate_hz == self.whisper_sample_rate:
-            return audio.astype(np.float32, copy=False)
-
-        source_num_samples = audio.shape[0]
-        target_num_samples = int(round(source_num_samples * self.whisper_sample_rate / source_sample_rate_hz))
-        if target_num_samples <= 1:
-            return np.array([], dtype=np.float32)
-
-        source_positions = np.linspace(0, source_num_samples - 1, num=source_num_samples)
-        target_positions = np.linspace(0, source_num_samples - 1, num=target_num_samples)
-        return np.interp(target_positions, source_positions, audio).astype(np.float32)

@@ -24,10 +24,20 @@ async def main():
     aria_imager = AriaImager(image_request_queue, image_data_queue)
 
     audio_data_queue = Queue()
-    transcription_worker = TranscriptionWorker(audio_data_queue, WHISPER_MODEL_NAME, TRANSCRIPTION_WARMUP_SEC, PHRASE_TIMEOUT_SEC, False)
-    # TODO pipe transcriptions into the prompts. May require a refactor of GUM again to allow many
-    # different contexts for initial data
+    transcription_worker = TranscriptionWorker(
+        audio_data_queue,
+        WHISPER_MODEL_NAME,
+        PHRASE_TIMEOUT_SEC,
+        AUDIO_SAMPLE_RATE,
+        SR_THRESHOLD,
+        SR_THRESHOLD_TIME,
+        FRAME_DURATION_MS,
+        START_TRANSCRIPTION_WINDOW_S,
+        START_TRANSCRIPTION_THRESHOLD,
+        True
+        )
     transcription_worker.start_transcription_worker()
+    context_generators = [TranscriptionContextGenerator(transcription_worker)]
 
     handler = AgptGlassesHandler(False, image_request_queue, image_data_queue, asyncio.get_running_loop(), audio_data_queue, AUDIO_SAMPLE_RATE, WHISPER_SAMPLE_RATE)
     handler.setup_device(DEVICE_IP, INITIAL_CONNECTION_OVER_WIFI, STREAM_CONFIG_NAME, STREAM_BATCH_PERIOD_MS, STREAMING_IP, STREAM_OVER_WIFI)
@@ -37,8 +47,17 @@ async def main():
     handler.start_device_streaming()
     handler.start_streaming_receiver()
 
-    context_generators = [TranscriptionContextGenerator(transcription_worker)]
-    image_observer = ImageObserver("qwen3.5-vision", api_key=LLM_API_TOKEN, api_base=LLM_API_BASE, imager=aria_imager, save_images=True, transcription_prompt=TRANSCRIPTION_PROMPT, summary_prompt=SUMMARY_PROMPT, history_k=4, context_generators=context_generators)
+    image_observer = ImageObserver(
+        "qwen3.5-vision",
+        api_key=LLM_API_TOKEN,
+        api_base=LLM_API_BASE,
+        imager=aria_imager,
+        save_images=True,
+        transcription_prompt=TRANSCRIPTION_PROMPT,
+        summary_prompt=SUMMARY_PROMPT,
+        history_k=4,
+        context_generators=context_generators
+        )
 
     print("Streaming... Press Ctrl+C to stop")
     try:

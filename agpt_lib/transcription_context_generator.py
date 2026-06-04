@@ -21,9 +21,6 @@ class TranscriptionContextGenerator:
             str -- Current transcription text
         """
         async with self._lock:
-            # TODO commented lines aren't functional due to some problems with the transcription
-            # worker deciding when to end phrases. That fix will come in the next patch
-            # self._current_transcription = "\n".join(self.transcription_worker.get_transcription())
-            self._current_transcription = self.transcription_worker._in_progress_phrase
-            # self.transcription_worker.clear_transcription()
+            self._current_transcription = f"{self.transcription_worker.get_transcription()}\n{self.transcription_worker._in_progress_phrase}"
+            self.transcription_worker.clear_transcription()
             return f"Audio Transcription: {self._current_transcription}"

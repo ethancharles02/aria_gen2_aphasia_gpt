@@ -86,7 +86,7 @@ class TestGlassesHandler(AriaGlassesHandler):
         return output_bytes.tobytes()
 
     def save_audio(self, filename: str):
-        num_out_channels = 2
+        num_out_channels = 1
         audio_bytes = self._transform_audio_data(self.audio_data_bytes, num_out_channels)
 
         audio_segment = AudioSegment(
@@ -101,7 +101,18 @@ class TestGlassesHandler(AriaGlassesHandler):
 
 def main():
     audio_data_queue = Queue()
-    transcription_worker = TranscriptionWorker(audio_data_queue, WHISPER_MODEL_NAME, TRANSCRIPTION_WARMUP_SEC, PHRASE_TIMEOUT_SEC)
+    transcription_worker = TranscriptionWorker(
+        audio_data_queue,
+        WHISPER_MODEL_NAME,
+        PHRASE_TIMEOUT_SEC,
+        AUDIO_SAMPLE_RATE,
+        SR_THRESHOLD,
+        SR_THRESHOLD_TIME,
+        FRAME_DURATION_MS,
+        START_TRANSCRIPTION_WINDOW_S,
+        START_TRANSCRIPTION_THRESHOLD,
+        True
+        )
     transcription_worker.start_transcription_worker()
 
     handler = TestGlassesHandler(audio_data_queue, False)
