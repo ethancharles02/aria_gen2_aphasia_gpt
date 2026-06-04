@@ -5,7 +5,7 @@ Transcribe in markdown ALL the content from the provided images, paying special 
 
 NEVER SUMMARIZE ANYTHING. You must transcribe everything EXACTLY, word for word, but don't repeat yourself.
 
-ALWAYS include all the application names, file paths, and website URLs in your transcript.
+If there is not any legible text to transcribe, you may say so
 
 Create a FINAL structured markdown transcription."""
 
