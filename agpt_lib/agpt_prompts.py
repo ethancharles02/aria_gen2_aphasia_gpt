@@ -1,5 +1,5 @@
 # ----- IMAGE PROMPTS -----
-TRANSCRIPTION_PROMPT = """You will be given images from the perspective of the user wearing smart glasses. There is a fish eye distortion as a result. There may be a magenta square included which indicates where the user is looking
+TRANSCRIPTION_PROMPT = """You will be given images from the perspective of the user wearing smart glasses. The glasses camera applies a fish-eye lens distortion as a result.
 
 Transcribe in markdown ALL the content from the provided images, paying special attention to text. Also describe the environment in detail.
 
@@ -9,9 +9,9 @@ If there is not any legible text to transcribe, you may say so
 
 Create a FINAL structured markdown transcription."""
 
-SUMMARY_PROMPT = """You will be given images from the perspective of the user wearing smart glasses. There is a fish eye distortion as a result. There may be a magenta square included which indicates where the user is looking
+SUMMARY_PROMPT = """You will be given images from the perspective of the user wearing smart glasses. The glasses camera applies a fish-eye lens distortion as a result. There may be a magenta square included which indicates where the user is looking
 
-Provide a detailed description of the actions occuring across the provided images. The images are in the order they were taken.
+Provide a detailed description of the actions occurring across the provided images. The images are in the order they were taken.
 
 Include as much relevant detail as possible, but remain concise.
 
