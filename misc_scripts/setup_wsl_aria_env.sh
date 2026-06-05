@@ -6,9 +6,6 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_DIR="$REPO_ROOT/.venv"
-PYTHON_BIN="$VENV_DIR/bin/python"
-ARIA_SITE_PACKAGES=""
 
 log() {
   echo "[setup] $*"
@@ -61,59 +58,8 @@ ensure_new_libstdcpp() {
 }
 
 setup_python_env() {
-  if [[ ! -d "$VENV_DIR" ]]; then
-    log "Creating virtual environment at $VENV_DIR"
-    python3 -m venv "$VENV_DIR"
-  else
-    log "Using existing virtual environment at $VENV_DIR"
-  fi
-
-  # Activate venv so all subsequent python/pip commands run in the correct environment.
-  # shellcheck disable=SC1091
-  source "$VENV_DIR/bin/activate"
-
-  log "Installing Python dependencies"
-  python -m pip install --upgrade pip
-  python -m pip install \
-    projectaria-client-sdk \
-    rerun-sdk \
-    torch \
-    openai-whisper \
-    transformers \
-    openai \
-    SQLAlchemy \
-    sqlalchemy-utils \
-    pydantic \
-    scikit-learn \
-    numpy \
-    aiosqlite \
-    greenlet \
-    persist-queue \
-    python-dotenv \
-    pydub
-
-  ARIA_SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/aria"
-  deactivate
-}
-
-fix_sdk_shared_object_suffixes() {
-  if [[ ! -d "$ARIA_SITE_PACKAGES" ]]; then
-    warn "Aria site-packages not found at $ARIA_SITE_PACKAGES; skipping ABI symlink fix"
-    return
-  fi
-
-  local sdk_gen2_fb="$ARIA_SITE_PACKAGES/sdk_gen2.cpython-310-fb-010-x86_64.so"
-  local sdk_fb="$ARIA_SITE_PACKAGES/sdk.cpython-310-fb-010-x86_64.so"
-
-  if [[ -f "$sdk_gen2_fb" ]]; then
-    ln -sf "$(basename "$sdk_gen2_fb")" "$ARIA_SITE_PACKAGES/sdk_gen2.cpython-310-x86_64-linux-gnu.so"
-    log "Ensured sdk_gen2 ABI compatibility symlink"
-  fi
-
-  if [[ -f "$sdk_fb" ]]; then
-    ln -sf "$(basename "$sdk_fb")" "$ARIA_SITE_PACKAGES/sdk.cpython-310-x86_64-linux-gnu.so"
-    log "Ensured sdk ABI compatibility symlink"
-  fi
+  log "Setting up Python virtual environment"
+  bash "$REPO_ROOT/misc_scripts/setup_venv.sh"
 }
 
 configure_network_manager_for_aria() {
@@ -229,9 +175,6 @@ ensure_aria_usb_network_ready() {
 }
 
 validate_install() {
-  log "Validating Aria imports"
-  "$PYTHON_BIN" -c "import aria.sdk_gen2; import aria.stream_receiver; print('Aria SDK import OK')"
-
   ensure_aria_usb_network_ready
 }
 

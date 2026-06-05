@@ -48,9 +48,9 @@ async def main():
     handler.start_streaming_receiver()
 
     image_observer = ImageObserver(
-        "qwen3.5-vision",
-        api_key=LLM_API_TOKEN,
-        api_base=LLM_API_BASE,
+        VISION_LLM_IDENTIFIER,
+        api_key=VISION_LLM_API_TOKEN,
+        api_base=VISION_LLM_API_BASE,
         imager=aria_imager,
         save_images=True,
         transcription_prompt=TRANSCRIPTION_PROMPT,
@@ -62,11 +62,11 @@ async def main():
     print("Streaming... Press Ctrl+C to stop")
     try:
         async with gum(
-                "Ethan",
-                "qwen3.5-vision",
+                USER_NAME,
+                TEXT_LLM_IDENTIFIER,
                 image_observer,
-                api_base=LLM_API_BASE,
-                api_key=LLM_API_TOKEN,
+                api_base=TEXT_LLM_API_BASE,
+                api_key=TEXT_LLM_API_TOKEN,
                 propose_prompt=PROPOSE_PROMPT,
                 similar_prompt=SIMILAR_PROMPT,
                 revise_prompt=REVISE_PROMPT,
