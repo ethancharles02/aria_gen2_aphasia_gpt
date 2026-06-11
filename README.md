@@ -35,7 +35,16 @@ This project integrates Project Aria Gen2 smart glasses with AI models to create
                                                     # the program will tell you the IP on connection
    ```
 
-2. **Set up the virtual environment**:
+2. **Install packages** (only necessary on Linux):
+    ```bash
+    sudo apt install \
+    build-essential \
+    ffmpeg \
+    android-tools-adb \
+    android-tools-fastboot
+    ```
+
+3. **Set up the virtual environment**:
     On Linux:
     ```bash
     bash misc_scripts/setup_venv.sh
@@ -47,10 +56,15 @@ This project integrates Project Aria Gen2 smart glasses with AI models to create
     bash misc_scripts/setup_wsl_aria_env.sh
     ```
     Installs all necessary packages for the WSL environment
-3. **Activate the environment**:
+
+4. **Activate the environment**:
    ```bash
    source .venv/bin/activate
    ```
+
+5. **Connect Glasses**:
+    - Follow this guide for setting up the glasses: https://facebookresearch.github.io/projectaria_tools/gen2/ark/client-sdk/authentication
+    - Once they are plugged in and connected, you should be able to run ```main.py```. It will connect over USB but also let you know the Device IP in case you want to connect over WiFi in the future
 
 ### Configuration
 
