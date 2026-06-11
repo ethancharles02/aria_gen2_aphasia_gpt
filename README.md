@@ -45,6 +45,7 @@ This project integrates Project Aria Gen2 smart glasses with AI models to create
     ```
 
 3. **Set up the virtual environment**:
+
     On Linux:
     ```bash
     bash misc_scripts/setup_venv.sh
@@ -63,8 +64,7 @@ This project integrates Project Aria Gen2 smart glasses with AI models to create
    ```
 
 5. **Connect Glasses**:
-    - Follow this guide for setting up the glasses: https://facebookresearch.github.io/projectaria_tools/gen2/ark/client-sdk/authentication
-    - Once they are plugged in and connected, you should be able to run ```main.py```. It will connect over USB but also let you know the Device IP in case you want to connect over WiFi in the future
+    Follow this guide for setting up the glasses: https://facebookresearch.github.io/projectaria_tools/gen2/ark/client-sdk/authentication. Note that part of the guide is setting up the certificates whose paths are listed in `agpt_config.py`
 
 ### Configuration
 
@@ -97,45 +97,9 @@ This will:
 4. Begin real-time processing of visual and audio data
 5. Run indefinitely until interrupted (Ctrl+C)
 
-### Key Components
-
-#### Image Observer
-Processes video frames from Aria glasses:
-- Transcribes visible text and content
-- Generates detailed descriptions of user environment
-- Maintains a history of recent frames for context
-- Uses configurable vision LLM for analysis
-
-#### Audio Transcription Worker
-Real-time speech transcription:
-- Streams audio through Whisper ASR model
-- Detects speech activity and segments phrases
-- Configurable confidence thresholds and timeouts
-- Thread-based background processing
-
-#### General User Model (GUM)
-Central framework managing observations and propositions:
-- **Observations**: Raw data captured by observers (images, transcriptions)
-- **Propositions**: Generated hypotheses about user behavior
-- **Database**: SQLite backend for persistence
-
-## Development
-
-### Streaming Configuration
-Streaming settings can be defined in JSON format:
-- `agpt_streaming.json`: Custom image stream configuration
-- `streaming.json`: Fallback configuration
-
-## Certificates & Authentication
-
-Aria glasses require SSL certificates for secure streaming:
-- **Subscriber Certificate**: `~/.aria/streaming-certs/persistent/subscriber.pem`
-- **Subscriber Key**: `~/.aria/streaming-certs/persistent/subscriber-key.pem`
-
-See [Project Aria documentation](https://facebookresearch.github.io/projectaria_tools/gen2/ark/client-sdk/authentication) for setup.
-
 ## References
 
 - [Project Aria Tools Documentation](https://facebookresearch.github.io/projectaria_tools/gen2/)
 - [Whisper Speech Recognition](https://github.com/openai/whisper)
 - [OpenAI API Documentation](https://platform.openai.com/docs)
+- [GUM Paper](https://arxiv.org/html/2505.10831v2)
