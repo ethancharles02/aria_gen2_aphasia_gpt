@@ -143,7 +143,6 @@ class ImageObserver(Observer):
             messages=messages,
         )
         answer = chat_response.choices[0].message.content
-        # TODO This isn't a valid production setup. Handle it better
         if not answer:
             raise RuntimeError("Something went wrong with the model and it didn't produce a message")
         return answer

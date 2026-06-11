@@ -7,6 +7,7 @@ import threading
 
 import aria.stream_receiver as receiver
 import aria.sdk_gen2 as sdk_gen2
+from projectaria_tools.core.mps import EyeGaze
 from projectaria_tools.core.sensor_data import (
     AudioData,
     AudioDataRecord,
@@ -25,6 +26,10 @@ class AriaGlassesHandler:
         self.connect_over_wifi = None
         self._temperature_stop_event = threading.Event()
         self._device_throttling = False
+        self._do_image_callback = False
+        self._do_audio_callback = False
+        self._do_eyegaze_callback = False
+        self._device_calibration = None
 
     def setup_streaming_receiver(self, record_to_vrs: str = "", address: str = "0.0.0.0", port: int = 6768):
         self.server_config = sdk_gen2.HttpServerConfig()
@@ -40,9 +45,14 @@ class AriaGlassesHandler:
         self.stream_receiver.set_rgb_queue_size(2)
         self.stream_receiver.set_et_queue_size(4)
 
-        self.stream_receiver.register_rgb_callback(self._image_callback)
-        self.stream_receiver.register_audio_callback(self._audio_callback)
-        # self.stream_receiver.register_eye_gaze_callback(eyegaze_callback)
+        if self._do_image_callback:
+            self.stream_receiver.register_rgb_callback(self._image_callback)
+        if self._do_audio_callback:
+            self.stream_receiver.register_audio_callback(self._audio_callback)
+        if self._do_eyegaze_callback:
+            self.stream_receiver.register_eye_gaze_callback(self._eyegaze_callback)
+
+        self.stream_receiver.register_device_calib_callback(self._device_calib_callback)
 
     def setup_device(
             self,
@@ -120,6 +130,9 @@ class AriaGlassesHandler:
             return
         self.device.start_streaming()
 
+    def _device_calib_callback(self, device_calibration):
+        self._device_calibration = device_calibration
+
     def _get_temp_str(self, status) -> str:
         temp_str = f"{status.skin_temp_celsius:.1f}°C"
         if status.thermal_mitigation_triggered:
@@ -194,4 +207,7 @@ class AriaGlassesHandler:
         raise NotImplementedError
 
     def _audio_callback(self, audio_data: AudioData, audio_record: AudioDataRecord, num_channels: int):
+        raise NotImplementedError
+
+    def _eyegaze_callback(self, eyegaze_data: EyeGaze):
         raise NotImplementedError

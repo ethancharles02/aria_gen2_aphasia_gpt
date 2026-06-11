@@ -5,8 +5,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from pydub import AudioSegment
 from queue import Queue
-import numpy as np
+import cv2
 
+from projectaria_tools.core.mps import EyeGaze
 from projectaria_tools.core.sensor_data import (
     AudioData,
     AudioDataRecord,
@@ -19,10 +20,18 @@ from agpt_lib.agpt_config import *
 from agpt_lib.agpt_prompts import *
 from agpt_lib.agpt_secrets import *
 from agpt_lib.aria_glasses_handler import AriaGlassesHandler
+from agpt_lib.aria_helpers import transform_audio_data, project_eyegaze
 from agpt_lib.transcription_worker import TranscriptionWorker
 
 class TestGlassesHandler(AriaGlassesHandler):
-    def __init__(self, audio_data_queue: Queue, do_print_stats: bool):
+    def __init__(
+            self,
+            audio_data_queue: Queue,
+            do_print_stats: bool,
+            show_live_stream: bool,
+            do_image_callback: bool = True,
+            do_audio_callback: bool = True,
+            do_eyegaze_callback: bool = True):
         super().__init__()
         self.image_callback_count = 0
         self.image_callback_str = 0
@@ -34,6 +43,16 @@ class TestGlassesHandler(AriaGlassesHandler):
         self.num_channels = None
 
         self.do_print_stats = do_print_stats
+        self.show_live_stream = show_live_stream
+
+        self._do_image_callback = do_image_callback
+        self._do_audio_callback = do_audio_callback
+        self._do_eyegaze_callback = do_eyegaze_callback
+
+        # Eyegaze stuff
+        self._streaming_manager = None
+        self._last_et_pixel = []
+        self._last_et_timestamp_s = None
 
     def _print_stats(self):
         if self.do_print_stats:
@@ -43,6 +62,19 @@ class TestGlassesHandler(AriaGlassesHandler):
         self.image_callback_count += 1
         self.image_callback_str = f"{self.image_callback_count}, Temperature: {image_record.temperature}"
         self._print_stats()
+
+        img_arr = None
+        bgr_img = None
+
+        if self.show_live_stream:
+            img_arr = image_data.to_numpy_array()
+            bgr_img = cv2.cvtColor(img_arr, cv2.COLOR_RGB2BGR)
+            if self._last_et_timestamp_s is not None:
+                # Check if they are within the threshold of each other
+                if image_record.capture_timestamp_ns / 1000 - self._last_et_timestamp_s * 1_000_000 < 1000 * EYEGAZE_THRESHOLD_TIME:
+                    cv2.circle(bgr_img, (int(self._last_et_pixel[0]), int(self._last_et_pixel[1])), EYEGAZE_RADIUS, EYEGAZE_COLOR, -1)
+            cv2.imshow("Live View", bgr_img)
+            cv2.waitKey(1)
 
     def _audio_callback(self, audio_data: AudioData, audio_record: AudioDataRecord, num_channels: int):
         if self.num_channels is None:
@@ -57,37 +89,19 @@ class TestGlassesHandler(AriaGlassesHandler):
 
         self.audio_data_bytes += audio_data.data
         # Add single channel audio data to queue
-        self.audio_data_queue.put(self._transform_audio_data(audio_data.data, 1))
+        self.audio_data_queue.put(transform_audio_data(self.num_channels, audio_data.data, 1))
 
-    def _transform_audio_data(self, full_audio_data_bytes: list[int], num_output_channels: int) -> bytes:
-        if self.num_channels is None:
-            print("Number of channels not set, returning empty bytes")
-            return bytes()
+    def _eyegaze_callback(self, eyegaze_data: EyeGaze):
+        # Get the projected coordinates of the eye gaze point on the image
+        maybe_pixel = project_eyegaze(eyegaze_data, self._device_calibration)
 
-        if num_output_channels > self.num_channels:
-            print("Can't increase number of channels past original")
-            return bytes()
-
-        raw_array = np.array(full_audio_data_bytes, dtype=np.int32)
-
-        spatial_data = raw_array.reshape(-1, self.num_channels)
-
-        d_channels = self.num_channels // num_output_channels
-        leftover = self.num_channels % num_output_channels
-
-        leftover_channel = [] if leftover == 0 else [np.mean(spatial_data[:, self.num_channels-leftover:self.num_channels], axis=1)]
-        channels = [np.mean(spatial_data[:, i * d_channels:(i + 1) * d_channels], axis=1) for i in range(num_output_channels)] + leftover_channel
-
-        # Divides by 255 since mp3 expects 16 bit but the aria stream appears to be 24 bit
-        channels = tuple(map(lambda channel: (channel / 255).astype(np.int16), channels))
-
-        output_bytes = np.column_stack(channels)
-
-        return output_bytes.tobytes()
+        if maybe_pixel is not None:
+            self._last_et_pixel = maybe_pixel
+            self._last_et_timestamp_s = eyegaze_data.tracking_timestamp.total_seconds()
 
     def save_audio(self, filename: str):
         num_out_channels = 1
-        audio_bytes = self._transform_audio_data(self.audio_data_bytes, num_out_channels)
+        audio_bytes = transform_audio_data(self.num_channels, self.audio_data_bytes, num_out_channels)
 
         audio_segment = AudioSegment(
             data=audio_bytes,
@@ -111,11 +125,11 @@ def main():
         FRAME_DURATION_MS,
         START_TRANSCRIPTION_WINDOW_S,
         START_TRANSCRIPTION_THRESHOLD,
-        True
+        False
         )
     transcription_worker.start_transcription_worker()
 
-    handler = TestGlassesHandler(audio_data_queue, False)
+    handler = TestGlassesHandler(audio_data_queue, False, True)
     handler.setup_device(DEVICE_IP, INITIAL_CONNECTION_OVER_WIFI, STREAM_CONFIG_NAME, STREAM_BATCH_PERIOD_MS, STREAMING_IP, STREAM_OVER_WIFI)
     handler.setup_streaming_receiver("", "0.0.0.0", 6768)
 

@@ -43,6 +43,15 @@ SR_THRESHOLD_TIME = 2
 # Can be 10, 20, or 30 milliseconds
 FRAME_DURATION_MS = 30
 # Time to look back to decide if speaking has started
-START_TRANSCRIPTION_WINDOW_S = 0.5
+START_TRANSCRIPTION_WINDOW_S = 1.0
 # Threshold of frames that were detected as speech in the window
 START_TRANSCRIPTION_THRESHOLD = 0.7
+
+# --- EyeGaze ---
+# B, G, R
+EYEGAZE_COLOR = (255, 0, 255)
+EYEGAZE_RADIUS = 5
+# Time in milliseconds to allow the eyegaze to be placed on the image (ie. if the image was taken at
+# 100ms but the eyegaze was at 300ms and the threshold was 100ms, it wouldn't be added to that
+# image)
+EYEGAZE_THRESHOLD_TIME = 500

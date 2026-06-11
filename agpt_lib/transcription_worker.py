@@ -113,10 +113,10 @@ class TranscriptionWorker:
         return False
 
     def _is_speech(self, audio_bytes: bytes):
-        # TODO only use this for testing, remove when done
-        frame_size = int(self.sample_rate * (self._frame_duration_ms / 1000.0) * 2)
-        if len(audio_bytes) != frame_size:
-            raise ValueError(f"Audio frame must be exactly {frame_size} bytes.")
+        # Use this to make sure that it always matches the expected size
+        # frame_size = int(self.sample_rate * (self._frame_duration_ms / 1000.0) * 2)
+        # if len(audio_bytes) != frame_size:
+        #     raise ValueError(f"Audio frame must be exactly {frame_size} bytes.")
 
         return self._vad.is_speech(audio_bytes, self.sample_rate)
 
@@ -181,6 +181,7 @@ class TranscriptionWorker:
                     self._set_phrase_complete()
                     continue
 
+                # TODO This could possibly be improved by cutting off bytes before the speech threshold window
                 if not self._enable_transcription and self._is_above_speech_threshold(self._start_transcription_threshold, self._start_threshold_size):
                     self._enable_transcription = True
 
@@ -196,11 +197,9 @@ class TranscriptionWorker:
                     print(f"Whisper transcription error: {exc}")
                     continue
 
-                text = result.get("text", "").strip()
-                if not text:
+                self._in_progress_phrase = result.get("text", "").strip()
+                if not self._in_progress_phrase:
                     continue
-
-                self._in_progress_phrase = text
 
             # Forces a completion if the timeout is reached
             if self._phrase_time and time.monotonic() - self._phrase_time > self.phrase_timeout_sec:
