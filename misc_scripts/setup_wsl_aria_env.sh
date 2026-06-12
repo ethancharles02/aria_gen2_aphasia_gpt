@@ -57,6 +57,19 @@ ensure_new_libstdcpp() {
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libstdc++6
 }
 
+ensure_python312() {
+  if command -v python3.12 >/dev/null 2>&1; then
+    log "Python 3.12 is already available"
+    return
+  fi
+
+  log "Installing Python 3.12 from deadsnakes PPA"
+  sudo add-apt-repository -y ppa:deadsnakes/ppa
+  sudo apt-get update
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3.12 python3.12-venv python3.12-dev
+  log "Python 3.12 installed successfully"
+}
+
 setup_python_env() {
   log "Setting up Python virtual environment"
   bash "$REPO_ROOT/misc_scripts/setup_venv.sh"
@@ -230,8 +243,8 @@ main() {
   ensure_sudo
   install_apt_prereqs
   ensure_new_libstdcpp
+  ensure_python312
   setup_python_env
-  fix_sdk_shared_object_suffixes
   configure_network_manager_for_aria
   validate_install
   print_next_steps
