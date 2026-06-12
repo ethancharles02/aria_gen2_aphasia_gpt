@@ -41,8 +41,7 @@ setup_python_env() {
         persist-queue \
         python-dotenv \
         pydub \
-        opencv-python \
-        webrtcvad-wheels
+        opencv-python
 
     deactivate
 }
