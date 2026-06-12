@@ -32,6 +32,7 @@ async def main():
         SR_THRESHOLD,
         SR_THRESHOLD_TIME,
         FRAME_DURATION_MS,
+        VAD_SPEECH_THRESHOLD,
         START_TRANSCRIPTION_WINDOW_S,
         START_TRANSCRIPTION_THRESHOLD,
         False

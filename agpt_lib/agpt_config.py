@@ -35,13 +35,14 @@ WHISPER_MODEL_NAME = "base.en"
 AUDIO_SAMPLE_RATE = 16000
 # How long to transcribe before forcing a phrase end
 PHRASE_TIMEOUT_SEC = 30.0
-TRANSCRIPTION_WARMUP_SEC = 3.0
 # Confidence of no speech within threshold time (ie. this percent of samples didn't have speech detected)
 SR_THRESHOLD = 0.95
 # Threshold of time in seconds
 SR_THRESHOLD_TIME = 2
-# Can be 10, 20, or 30 milliseconds
-FRAME_DURATION_MS = 30
+# Frame of time that is fed to the vad model
+FRAME_DURATION_MS = 32
+# Model confidence threshold to decide if the chunk has speech in it or not
+VAD_SPEECH_THRESHOLD = 0.5
 # Time to look back to decide if speaking has started
 START_TRANSCRIPTION_WINDOW_S = 1.0
 # Threshold of frames that were detected as speech in the window

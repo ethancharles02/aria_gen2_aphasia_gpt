@@ -1,3 +1,4 @@
+from pydub import AudioSegment
 import numpy as np
 
 from projectaria_tools.core.mps import EyeGaze
@@ -28,6 +29,17 @@ def transform_audio_data(num_audio_channels: int, full_audio_data_bytes: list[in
     output_bytes = np.column_stack(channels)
 
     return output_bytes.tobytes()
+
+def save_audio(filename: str, audio_bytes: bytes, num_channels: int, sample_rate: int):
+        audio_segment = AudioSegment(
+            data=audio_bytes,
+            sample_width=2,
+            frame_rate=sample_rate,
+            channels=num_channels
+        )
+
+        audio_segment.export(filename, format="mp3")
+        print(f"Saved audio to {filename}")
 
 def project_eyegaze(eyegaze_data: EyeGaze, device_calibration: DeviceCalibration) -> (tuple[float, float] | None):
     if device_calibration is None:

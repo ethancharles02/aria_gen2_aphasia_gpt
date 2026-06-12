@@ -7,7 +7,6 @@ import numpy as np
 import threading
 import time
 import torch
-import webrtcvad
 
 _has_whisper = False
 try:
@@ -15,6 +14,8 @@ try:
     _has_whisper = True
 except ImportError:
     print("Whisper is not installed; audio transcription is disabled.")
+
+from .aria_helpers import save_audio
 
 class TranscriptionWorker:
     def __init__(
@@ -26,9 +27,11 @@ class TranscriptionWorker:
             sr_threshold: float,
             sr_threshold_time: float,
             frame_duration_ms: int,
+            vad_speech_threshold: float,
             start_transcription_window_s: float,
             start_transcription_threshold: float,
-            do_print_transcription: bool = True
+            do_print_transcription: bool = True,
+            save_phrase_audio: bool = False
             ):
         self.whisper = None
         self.whisper_model_name = whisper_model_name
@@ -39,6 +42,7 @@ class TranscriptionWorker:
         self.worker_stop_event = threading.Event()
 
         self._phrase_bytes = bytes()
+        self._phrases_completed = 0
 
         self.sr_threshold = sr_threshold
         self._sr_threshold_time = sr_threshold_time
@@ -62,8 +66,14 @@ class TranscriptionWorker:
         self.transcription_started_at = 0.0
         self.phrase_timeout_sec = phrase_timeout_sec
         self.do_print_transcription = do_print_transcription
+        self.save_phrase_audio = save_phrase_audio
 
-        self._vad = webrtcvad.Vad(2)
+        self._vad_model, utils = torch.hub.load(
+            repo_or_dir='snakers4/silero-vad',
+            model='silero_vad',
+            force_reload=False
+        )
+        self._vad_speech_threshold = vad_speech_threshold
 
         self._transcription_lines = [""]
         self._in_progress_phrase = ""
@@ -112,19 +122,25 @@ class TranscriptionWorker:
             return True
         return False
 
-    def _is_speech(self, audio_bytes: bytes):
-        # Use this to make sure that it always matches the expected size
-        # frame_size = int(self.sample_rate * (self._frame_duration_ms / 1000.0) * 2)
-        # if len(audio_bytes) != frame_size:
-        #     raise ValueError(f"Audio frame must be exactly {frame_size} bytes.")
+    def _is_speech(self, audio_bytes: bytes) -> bool:
+        if not audio_bytes:
+            return False
 
-        return self._vad.is_speech(audio_bytes, self.sample_rate)
+        # Convert raw bytes to an int16 numpy array, then normalize to float32 (-1.0 to 1.0)
+        audio_np = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+        audio_tensor = torch.from_numpy(audio_np)
+
+        speech_prob = self._vad_model(audio_tensor, self.sample_rate).item()
+        return speech_prob >= self._vad_speech_threshold
 
     def _set_phrase_complete(self):
-        self._phrase_bytes = bytes()
-        phrase_to_add = self._in_progress_phrase.strip()
+        phrase_to_add = self._in_progress_phrase
         if phrase_to_add:
+            if self.save_phrase_audio:
+                self._phrases_completed += 1
+                save_audio(f"saved_audio_{self._phrases_completed}.mp3", self._phrase_bytes, 1, self.sample_rate)
             self._transcription_lines.append(phrase_to_add)
+        self._phrase_bytes = bytes()
         self._in_progress_phrase = ""
         self.is_speech_list.clear()
         self._phrase_time = time.monotonic()

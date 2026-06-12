@@ -27,6 +27,7 @@ setup_python_env() {
         projectaria-client-sdk \
         rerun-sdk \
         torch \
+        torchaudio \
         openai-whisper \
         transformers \
         openai \

@@ -20,7 +20,7 @@ from agpt_lib.agpt_config import *
 from agpt_lib.agpt_prompts import *
 from agpt_lib.agpt_secrets import *
 from agpt_lib.aria_glasses_handler import AriaGlassesHandler
-from agpt_lib.aria_helpers import transform_audio_data, project_eyegaze
+from agpt_lib.aria_helpers import transform_audio_data, project_eyegaze, save_audio
 from agpt_lib.transcription_worker import TranscriptionWorker
 
 class TestGlassesHandler(AriaGlassesHandler):
@@ -99,20 +99,6 @@ class TestGlassesHandler(AriaGlassesHandler):
             self._last_et_pixel = maybe_pixel
             self._last_et_timestamp_s = eyegaze_data.tracking_timestamp.total_seconds()
 
-    def save_audio(self, filename: str):
-        num_out_channels = 1
-        audio_bytes = transform_audio_data(self.num_channels, self.audio_data_bytes, num_out_channels)
-
-        audio_segment = AudioSegment(
-            data=audio_bytes,
-            sample_width=2,
-            frame_rate=AUDIO_SAMPLE_RATE,
-            channels=num_out_channels
-        )
-
-        audio_segment.export(filename, format="mp3")
-        print(f"Saved audio to {filename}")
-
 def main():
     audio_data_queue = Queue()
     transcription_worker = TranscriptionWorker(
@@ -123,13 +109,15 @@ def main():
         SR_THRESHOLD,
         SR_THRESHOLD_TIME,
         FRAME_DURATION_MS,
+        VAD_SPEECH_THRESHOLD,
         START_TRANSCRIPTION_WINDOW_S,
         START_TRANSCRIPTION_THRESHOLD,
-        False
+        True,
+        True
         )
     transcription_worker.start_transcription_worker()
 
-    handler = TestGlassesHandler(audio_data_queue, False, True)
+    handler = TestGlassesHandler(audio_data_queue, False, False)
     handler.setup_device(DEVICE_IP, INITIAL_CONNECTION_OVER_WIFI, STREAM_CONFIG_NAME, STREAM_BATCH_PERIOD_MS, STREAMING_IP, STREAM_OVER_WIFI)
     handler.setup_streaming_receiver("", "0.0.0.0", 6768)
 
@@ -155,7 +143,9 @@ def main():
     for line in transcription_worker._transcription_lines:
         print(line)
 
-    handler.save_audio("saved_audio.mp3")
+    num_out_channels = 1
+    audio_bytes = transform_audio_data(handler.num_channels, handler.audio_data_bytes, num_out_channels)
+    save_audio("saved_audio.mp3", audio_bytes, num_out_channels, AUDIO_SAMPLE_RATE)
 
 if __name__ == "__main__":
     main()

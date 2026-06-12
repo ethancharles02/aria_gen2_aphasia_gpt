@@ -15,7 +15,7 @@ This project integrates Project Aria Gen2 smart glasses with AI models to create
 ## Installation & Setup
 
 ### Prerequisites
-- Python 3.10-3.12
+- Python 3.12
 - Project Aria Gen2 smart glasses
 - Linux environment (also tested on WSL)
 
@@ -103,3 +103,4 @@ This will:
 - [Whisper Speech Recognition](https://github.com/openai/whisper)
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [GUM Paper](https://arxiv.org/html/2505.10831v2)
+- [Voice Activity Detector](https://github.com/snakers4/silero-vad)
