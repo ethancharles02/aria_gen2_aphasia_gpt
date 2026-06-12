@@ -20,10 +20,10 @@ STREAM_CONFIG_NAME = "agpt_lib/agpt_streaming.json"
 # Amount of time to batch messages to send over the network. For Wi-Fi streaming, this should be
 # around 200 to prevent overheating (see
 # https://facebookresearch.github.io/projectaria_tools/gen2/ark/client-sdk/streaming#message-batching)
-STREAM_OVER_WIFI = True
 STREAM_BATCH_PERIOD_MS = 200
+STREAM_OVER_WIFI = True
 # Connects to the glasses over wifi. Must have DEVICE_IP set in agpt_secrets for this to work
-INITIAL_CONNECTION_OVER_WIFI = False
+INITIAL_CONNECTION_OVER_WIFI = True
 
 # --- Debug ---
 # Disables audio transcription and instead shows the temperature

@@ -210,7 +210,7 @@ Next steps:
     usbipd list
 
 5) Attach Aria USB to WSL from Windows PowerShell:
-    usbipd attach --wsl Ubuntu-22.04 --busid <BUSID>
+    usbipd attach --wsl Ubuntu-22.04 --busid <BUSID> --auto-attach
 
 6) Run the below script to refresh the USB data to aria can see it:
   ./misc_scripts/prepare_aria_view.sh
